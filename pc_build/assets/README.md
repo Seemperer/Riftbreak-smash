@@ -66,15 +66,24 @@ using EXACTLY these filenames (rename your downloads to match):
 
 | File | Stage it skins |
 |---|---|
+| `ember_arena.png` | Ember Arena (twin volcanoes, obsidian arch) |
 | `sky_battlefield.png` | Sky Battlefield (floating sky ruins) |
-| `magma_core.png` | Magma Core (volcano arena) |
-| `glacier.png` | Glacier (ice aurora) |
+| `void_final.png` | Void Final (void monoliths) |
+| `fungal_hollow.png` | Fungal Hollow (glowing mushroom grove) |
+| `storm_spire.png` | Storm Spire (lightning tower) |
+| `tide_vault.png` | Tide Vault (sunken vault) |
 | `iron_foundry.png` | Iron Foundry (skull fortress) |
+| `thorn_garden.png` | Thorn Garden (moonlit briar) |
+| `glacier.png` | Glacier (ice aurora) |
+| `dune_sea.png` | Dune Sea (desert obelisk) |
 | `hollow_star.png` | Hollow Star (orbital station) |
+| `clockwork.png` | Clockwork (brass engine room) |
+| `magma_core.png` | Magma Core (volcano arena) |
+| `cloud_nine.png` | Cloud Nine (rainbow sky) |
+| `the_rift.png` | The Rift (void vortex) |
 | `harbor_town.png` | Harbor Town (plaza) |
 | `world_tree.png` | World Tree (great tree island) |
 | `sunset_keep.png` | Sunset Keep (castle at dusk) |
-| `the_rift.png` | The Rift (void vortex) |
 
 The mapping lives in `pc_build/assets/stages.json` (stage name → file).
 Optional: add `<same-name>_mid.png` (transparent PNG) for a parallax

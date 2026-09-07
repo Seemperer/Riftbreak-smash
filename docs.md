@@ -29,23 +29,36 @@ behind on stocks. Record kept per-fighter in `pc_build/save.json`.
 - **Battle format:** 1v1, **4 stocks**, **3:00 timer**, blast-zone KOs on huge scrolling stages
   (2800–4200px). Fast pace: short recoveries, quick countdown/KO/respawn, fast dash cooldown,
   +8% move speed, 40-HP shields. Timeout → higher stocks wins, tie → sudden death (both to 300%).
-- **Stages (18, big + scrolling + detailed):** Ember Arena (3000), Sky Battlefield (3200),
-  Void Final (2800), Fungal Hollow (bounce shrooms), Storm Spire (wind), Tide Vault (low-grav),
-  Iron Foundry (spikes), Thorn Garden (spikes), Glacier (slippery ice), Dune Sea (headwind),
-  Hollow Star (floaty), Clockwork (phasing platforms), Magma Core (spikes + bounce),
-  Cloud Nine (pads + wind), The Rift (4200, everything),
-  Harbor Town (clean plaza), World Tree (bounce bloom), Sunset Keep (rooftop duel).
+- **Stages (18, big + scrolling + detailed):** Ember Arena (volcano duel, lava channel,
+  crumbling crown), Sky Battlefield (pure tri-platform, no hazards), Void Final
+  (FD-style, single perch over the void), Fungal Hollow (shroom staircase, twin pads,
+  fragile cap), Storm Spire (vertical tower siege, tailwind), Tide Vault (sunken low-grav
+  vault, fragile bridge), Iron Foundry (spike rails + molten channel), Thorn Garden
+  (low brush row over thorn beds), Glacier (slippery summit, fragile peak), Dune Sea
+  (headwind dune steps), Hollow Star (orbital low-grav wings), Clockwork (phasing gear
+  room), Magma Core (twin lava vents + bounce pad), Cloud Nine (sky staircase, pad row,
+  tailwind), The Rift (4200, collapsing apex, everything), Harbor Town (clean plaza duel),
+  World Tree (canopy crossing, bounce bloom), Sunset Keep (rooftop duel, crumbling parapet).
+  Every arena has its own painted background (volcanoes, ruin islands, monoliths, spire,
+  sunken columns, gears, aurora, dunes, station ring, clock face, magma falls, rainbow,
+  vortex, lighthouse, world tree, keep), its own platform material (obsidian, marble,
+  void crystal, shroom wood, spire stone, abyss glass, riveted iron, briar, frost,
+  sandstone, station hull, brass, magmarock, cloud, rift crystal, harbor stone, bark,
+  keep stone) with matching supports (pillars, roots, floating crystals, chains, icicles).
   Collision platforms are aligned to the key art layouts. Camera follows the PLAYER (72% P1 +
   28% foe + velocity lookahead) with parallax;
   pillars, chains, runes, grass, lava cracks, pads, phases, spikes all drawn per theme.
   Blast zones scale with world width.
 - **Stage paintings:** drop AI-generated backgrounds in `pc_build/assets/stages/` using the exact
-  filenames in `pc_build/assets/stages.json` (e.g. `sky_battlefield.png` for the floating ruins,
-  `magma_core.png` for the volcano). Optional `<name>_mid.png` transparent layer parallaxes on top.
+  filenames in `pc_build/assets/stages.json` (all 18 stages mapped, e.g. `sky_battlefield.png`
+  for the floating ruins, `ember_arena.png` for the volcano duel, `void_final.png` for the
+  void monoliths — full list in `pc_build/assets/README.md`). Optional `<name>_mid.png` transparent layer parallaxes on top.
   Paintings cover-fit with camera scroll; procedural platforms/hazards/fighters draw over them and
   the glowing platforms always mark real ground. Missing files fall back to procedural art.
-- **Breakable terrain:** floating platforms marked cracked take melee/projectile/bomb/ult damage
-  and collapse (removed from collision), regenerating after 12s. Mains are never breakable.
+- **Breakable terrain:** standalone cracked platforms (never the main) take
+  melee/projectile/bomb/ult damage and collapse (removed from collision), regenerating
+  after 12s with a refill timer shown on the ghost outline. No more phantom doubles:
+  breakables never overlap solid platforms.
 - **Lava pools:** animated pools burn (+10%, 2s burn) and launch you out. Spikes: +8% pop-up.
 - **Roster — one file per fighter in `pc_build/fighters/`** (registry in `fighters/__init__.py`).
   Each module owns stats, projectile, specials + a signature mechanic no one else has:
@@ -128,22 +141,36 @@ behind on stocks. Record kept per-fighter in `pc_build/save.json`.
 
 ---
 
-## 13. Online versus (LAN, no servers)
+## 13. Online versus (LAN + internet rooms, no servers)
 
 Host-authoritative: the host simulates; the guest sends inputs (60Hz) and renders snapshots
-(20Hz) with local cosmetic fx. No determinism needed. Same WiFi, or ZeroTier/Hamachi/Radmin
-for internet play. Port **7001** TCP — allow it through the firewall.
+(20Hz) with local cosmetic fx. No determinism needed. Two ways to connect:
 
+**A. Internet room (no setup, no port forwarding).** Needs `pip install -r
+pc_build/requirements.txt` (adds `paho-mqtt`); traffic is relayed over a public broker.
+- HOST: title → ONLINE → INTERNET ROOM → HOST ROOM → pick fighter + stage → LOBBY
+  (shows your ROOM CODE, guest pick appears, ENTER starts). Send the code to your friend.
+- GUEST: title → ONLINE → INTERNET ROOM → JOIN ROOM → type the room code → pick
+  fighter → wait → fight.
+- If a hello/snapshot is lost in transit the host re-sends; play is smooth on normal
+  broadband (verified: guest inputs drive the host, mirror tracks within ~1 frame).
+
+**B. LAN / VPN (lowest latency).** Same WiFi, or ZeroTier/Hamachi/Radmin for internet
+play. Port **7001** TCP — allow it through the firewall.
 - HOST: title → ONLINE → HOST GAME → pick fighter + stage → LOBBY (shows your IP, guest
-  pick appears, ENTER starts). Pause works for both (guest asks, host toggles). If the guest
-  drops, CPU takes over their fighter mid-match. Rematch from the host starts a new round
-  for both.
+  pick appears, ENTER starts).
 - GUEST: title → ONLINE → JOIN GAME → type host IP → pick fighter → wait → fight.
-  Game over screen follows the host; ENTER returns to title (host rematch auto-rejoins you).
-- Protocol (`pc_build/netplay.py`, JSON lines over TCP): guest→host `in`/`pick`/`pause`/`ping`;
-  host→guest `hello`/`snap`/`lobby`/`pong`/`bye`. Snapshots are fully self-contained
-  (fighters, projectiles, rings, slashes, drops, timer, phase, announce, pause, winner),
-  so a dropped packet is just an old frame. Hello retransmits until guest input arrives.
+
+Both paths: pause works for both (guest asks, host toggles). If the guest
+drops, CPU takes over their fighter mid-match. Rematch from the host starts a new round
+for both.
+- Protocol (same messages on both transports): guest→host `in`/`pick`/`pause`/`ping`;
+  host→guest `hello`/`snap`/`lobby`/`pong`/`bye`. LAN uses `pc_build/netplay.py` (JSON
+  lines over TCP); internet rooms use `pc_build/netrelay.py` (same JSON over public-MQTT
+  topics `riftbreak/v1/<CODE>/h2g|g2h`, handshake at QoS 1). Snapshots are fully
+  self-contained (fighters, projectiles, rings, slashes, drops, timer, phase, announce,
+  pause, winner), so a dropped packet is just an old frame. Hello retransmits until
+  guest input arrives.
 - Notes: win records save on the host only; the host's win streak powers only the host;
   guest pause/game-over buttons are host-gated to prevent desyncs.
 

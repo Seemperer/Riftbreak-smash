@@ -12,11 +12,16 @@ Format: 4-stock rounds, 3:00 timer, blast-zone KOs. 18 stages. Online versus on 
 """
 import sys
 import os
+import time
 import math
 import random
 import json
 import pygame
 import netplay
+try:
+    import netrelay
+except Exception:
+    netrelay = None
 from fighters import ROSTER, FIGHTERS
 from fighters import traits as char_traits
 
@@ -24,122 +29,164 @@ W, H = 960, 540
 FPS = 60
 STOCKS = 4
 MATCH_TIME = 180
-SAVE_PATH = os.path.join(os.path.dirname(__file__), "save.json")
+def _user_dir():
+    if getattr(sys, "frozen", False):
+        d = os.path.join(os.path.expanduser("~"), ".riftbreak")
+        try:
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+        return d
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+SAVE_PATH = os.path.join(_user_dir(), "save.json")
 
 STAGES = [
+    # --- 1. EMBER ARENA: volcano duel. Wide main, 2 solid sides, crumbling crown. ---
     {"name": "Ember Arena", "top": (46, 12, 22), "bot": (130, 45, 25),
      "plat": (200, 110, 60), "glow": (255, 140, 60), "deco": "ember", "w": 3000,
+     "skin": "obsidian",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 750, "w": 150, "y": 310}, {"x": 750, "w": 150, "y": 180},
-               {"x": 1400, "w": 200, "y": 330}, {"x": 2100, "w": 150, "y": 250}],
-     "breakables": [{"x": 2100, "w": 150, "y": 250, "hp": 3}],
-     "lava": [{"x": 1050, "w": 120, "y": 430}]},
+     "plats": [{"x": 880, "w": 170, "y": 320}, {"x": 1950, "w": 170, "y": 320}],
+     "breakables": [{"x": 1365, "w": 270, "y": 215, "hp": 3}],
+     "lava": [{"x": 1395, "w": 210, "y": 430}]},
+    # --- 2. SKY BATTLEFIELD: pure competitive tri-platform. No hazards. ---
     {"name": "Sky Battlefield", "top": (40, 90, 190), "bot": (150, 200, 235),
      "plat": (235, 240, 250), "glow": (140, 220, 255), "deco": "sky", "w": 3200,
+     "skin": "marble",
      "main": {"x": 700, "w": 1800, "y": 430},
-     "plats": [{"x": 950, "w": 150, "y": 300}, {"x": 1525, "w": 150, "y": 210},
-               {"x": 2200, "w": 150, "y": 300}],
-     "breakables": [{"x": 1525, "w": 150, "y": 210, "hp": 3}]},
+     "plats": [{"x": 950, "w": 160, "y": 310}, {"x": 1520, "w": 160, "y": 215},
+               {"x": 2090, "w": 160, "y": 310}]},
+    # --- 3. VOID FINAL: Final-Destination duel. One high perch, endless void. ---
     {"name": "Void Final", "top": (12, 6, 26), "bot": (60, 20, 90),
      "plat": (120, 90, 160), "glow": (200, 120, 255), "deco": "void", "w": 2800,
+     "skin": "voidcrystal",
      "main": {"x": 700, "w": 1400, "y": 430},
-     "plats": [{"x": 1325, "w": 150, "y": 200}],
-     "breakables": [{"x": 1325, "w": 150, "y": 200, "hp": 2}]},
+     "plats": [{"x": 1250, "w": 300, "y": 250}]},
+    # --- 4. FUNGAL HOLLOW: bounce-shroom climb. Staircase + 2 pads, fragile cap. ---
     {"name": "Fungal Hollow", "top": (20, 40, 30), "bot": (70, 30, 90),
      "plat": (90, 160, 110), "glow": (170, 255, 150), "deco": "fungus", "w": 3200,
+     "skin": "shroom",
      "main": {"x": 700, "w": 1800, "y": 430},
-     "plats": [{"x": 850, "w": 140, "y": 330}, {"x": 1200, "w": 140, "y": 260},
-               {"x": 1550, "w": 140, "y": 190}, {"x": 1900, "w": 140, "y": 260}],
+     "plats": [{"x": 850, "w": 150, "y": 335}, {"x": 1180, "w": 150, "y": 265},
+               {"x": 1870, "w": 150, "y": 265}],
      "pads": [{"x": 1150, "w": 80, "y": 430, "pad": 780}, {"x": 1970, "w": 80, "y": 430, "pad": 780}],
-     "breakables": [{"x": 1550, "w": 140, "y": 190, "hp": 2}]},
+     "breakables": [{"x": 1525, "w": 150, "y": 195, "hp": 2}]},
+    # --- 5. STORM SPIRE: vertical tower siege. Stacked spire plats + tailwind. ---
     {"name": "Storm Spire", "top": (30, 40, 80), "bot": (90, 110, 150),
      "plat": (150, 170, 200), "glow": (255, 240, 150), "deco": "storm", "w": 3400, "wind": 70,
+     "skin": "spire",
      "main": {"x": 800, "w": 1800, "y": 430},
-     "plats": [{"x": 1000, "w": 160, "y": 300}, {"x": 2300, "w": 140, "y": 330},
-               {"x": 2300, "w": 140, "y": 220}, {"x": 2300, "w": 140, "y": 110}],
-     "breakables": [{"x": 2300, "w": 140, "y": 220, "hp": 3}]},
+     "plats": [{"x": 980, "w": 170, "y": 300}, {"x": 2280, "w": 150, "y": 335},
+               {"x": 2280, "w": 150, "y": 115}],
+     "breakables": [{"x": 2280, "w": 150, "y": 225, "hp": 3}]},
+    # --- 6. TIDE VAULT: sunken low-grav vault. One wide fragile bridge. ---
     {"name": "Tide Vault", "top": (10, 50, 90), "bot": (40, 130, 170),
      "plat": (90, 180, 200), "glow": (120, 230, 255), "deco": "sky", "w": 3000, "gravm": 0.85,
+     "skin": "abyss",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 800, "w": 140, "y": 340}, {"x": 1300, "w": 260, "y": 280}, {"x": 1960, "w": 140, "y": 340}],
-     "breakables": [{"x": 1300, "w": 260, "y": 280, "hp": 4}]},
+     "plats": [{"x": 800, "w": 150, "y": 340}, {"x": 1950, "w": 150, "y": 340}],
+     "breakables": [{"x": 1270, "w": 260, "y": 280, "hp": 4}]},
+    # --- 7. IRON FOUNDRY: hazard pit. Molten channel mid, spike rails at the edges. ---
     {"name": "Iron Foundry", "top": (30, 12, 14), "bot": (90, 40, 30),
      "plat": (140, 130, 130), "glow": (255, 170, 80), "deco": "ember", "w": 3200,
+     "skin": "foundry",
      "main": {"x": 700, "w": 1800, "y": 430},
-     "plats": [{"x": 1050, "w": 150, "y": 290}, {"x": 2050, "w": 150, "y": 290}],
-     "spikes": [{"x": 1200, "w": 90, "y": 430}, {"x": 1900, "w": 90, "y": 430}],
-     "breakables": [{"x": 2050, "w": 150, "y": 290, "hp": 3}],
-     "lava": [{"x": 1600, "w": 110, "y": 430}]},
+     "plats": [{"x": 900, "w": 160, "y": 295}, {"x": 2140, "w": 160, "y": 295}],
+     "spikes": [{"x": 1170, "w": 90, "y": 430}, {"x": 1940, "w": 90, "y": 430}],
+     "lava": [{"x": 1555, "w": 190, "y": 430}]},
+    # --- 8. THORN GARDEN: low skirmish row. Three brush ledges over thorn beds. ---
     {"name": "Thorn Garden", "top": (25, 45, 25), "bot": (60, 90, 60),
      "plat": (110, 150, 90), "glow": (200, 120, 220), "deco": "fungus", "w": 3000,
+     "skin": "thorn",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 800, "w": 140, "y": 350}, {"x": 1230, "w": 140, "y": 350},
-               {"x": 1660, "w": 140, "y": 350}],
-     "spikes": [{"x": 1000, "w": 80, "y": 430}, {"x": 1430, "w": 80, "y": 430}, {"x": 1840, "w": 80, "y": 430}]},
+     "plats": [{"x": 760, "w": 150, "y": 345}, {"x": 1325, "w": 150, "y": 345},
+               {"x": 1890, "w": 150, "y": 345}],
+     "spikes": [{"x": 990, "w": 90, "y": 430}, {"x": 1430, "w": 90, "y": 430}, {"x": 1830, "w": 90, "y": 430}]},
+    # --- 9. GLACIER: slippery summit. Wide frozen tri-platform, fragile peak. ---
     {"name": "Glacier", "top": (150, 190, 230), "bot": (210, 230, 245),
      "plat": (225, 240, 250), "glow": (170, 225, 255), "deco": "sky", "w": 3400, "ice": True,
+     "skin": "frost",
      "main": {"x": 800, "w": 1800, "y": 430},
-     "plats": [{"x": 1050, "w": 150, "y": 320}, {"x": 1575, "w": 150, "y": 210}, {"x": 2250, "w": 150, "y": 280}],
-     "breakables": [{"x": 1575, "w": 150, "y": 210, "hp": 3}]},
+     "plats": [{"x": 1030, "w": 160, "y": 320}, {"x": 2210, "w": 160, "y": 285}],
+     "breakables": [{"x": 1570, "w": 160, "y": 205, "hp": 3}]},
+    # --- 10. DUNE SEA: headwind crossing. Descending dune steps into the wind. ---
     {"name": "Dune Sea", "top": (150, 110, 60), "bot": (220, 170, 100),
      "plat": (210, 170, 120), "glow": (255, 230, 160), "deco": "storm", "w": 3600, "wind": -60,
+     "skin": "sandstone",
      "main": {"x": 900, "w": 1800, "y": 430},
-     "plats": [{"x": 1100, "w": 150, "y": 340}, {"x": 1500, "w": 150, "y": 280},
-               {"x": 1900, "w": 150, "y": 220}, {"x": 2250, "w": 150, "y": 280}],
-     "breakables": [{"x": 1900, "w": 150, "y": 220, "hp": 2}]},
+     "plats": [{"x": 1100, "w": 160, "y": 340}, {"x": 1480, "w": 160, "y": 280},
+               {"x": 2260, "w": 160, "y": 280}],
+     "breakables": [{"x": 1870, "w": 160, "y": 215, "hp": 2}]},
+    # --- 11. HOLLOW STAR: orbital low-grav. Wide wings, fragile zenith. ---
     {"name": "Hollow Star", "top": (30, 15, 60), "bot": (90, 50, 130),
      "plat": (150, 120, 190), "glow": (220, 160, 255), "deco": "void", "w": 3000, "gravm": 0.8,
+     "skin": "station",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 900, "w": 140, "y": 310}, {"x": 1430, "w": 140, "y": 220}, {"x": 2160, "w": 140, "y": 310}],
-     "breakables": [{"x": 1430, "w": 140, "y": 220, "hp": 3}]},
+     "plats": [{"x": 880, "w": 150, "y": 310}, {"x": 1970, "w": 150, "y": 310}],
+     "breakables": [{"x": 1425, "w": 150, "y": 220, "hp": 3}]},
+    # --- 12. CLOCKWORK: phasing engine room. 1 solid + 1 fragile + 3 ghost gears. ---
     {"name": "Clockwork", "top": (40, 38, 50), "bot": (100, 90, 80),
      "plat": (190, 170, 150), "glow": (255, 210, 130), "deco": "void", "w": 3200,
+     "skin": "brass",
      "main": {"x": 700, "w": 1800, "y": 430},
-     "plats": [{"x": 850, "w": 160, "y": 300}, {"x": 2190, "w": 160, "y": 300}],
+     "plats": [{"x": 850, "w": 170, "y": 300}],
      "phases": [{"x": 1300, "w": 150, "y": 300, "period": 4.0, "off": 0.0},
                 {"x": 1750, "w": 150, "y": 220, "period": 4.0, "off": 2.1},
                 {"x": 1300, "w": 150, "y": 150, "period": 5.0, "off": 4.2}],
-     "breakables": [{"x": 2190, "w": 160, "y": 300, "hp": 3}]},
+     "breakables": [{"x": 2130, "w": 170, "y": 300, "hp": 3}]},
+    # --- 13. MAGMA CORE: triple causeway over twin lava vents. Fragile mid. ---
     {"name": "Magma Core", "top": (60, 8, 10), "bot": (150, 30, 20),
      "plat": (180, 70, 50), "glow": (255, 100, 50), "deco": "ember", "w": 3400,
+     "skin": "magmarock",
      "main": {"x": 800, "w": 1800, "y": 430},
-     "plats": [{"x": 1100, "w": 150, "y": 280}, {"x": 1625, "w": 150, "y": 280}, {"x": 2150, "w": 150, "y": 280}],
+     "plats": [{"x": 1080, "w": 160, "y": 280}, {"x": 2160, "w": 160, "y": 280}],
      "spikes": [{"x": 1250, "w": 90, "y": 430}, {"x": 2060, "w": 90, "y": 430}],
-     "pads": [{"x": 1645, "w": 80, "y": 430, "pad": 820}],
-     "breakables": [{"x": 1625, "w": 150, "y": 280, "hp": 3}],
-     "lava": [{"x": 1450, "w": 110, "y": 430}, {"x": 1800, "w": 110, "y": 430}]},
+     "pads": [{"x": 1660, "w": 80, "y": 430, "pad": 820}],
+     "breakables": [{"x": 1620, "w": 160, "y": 280, "hp": 3}],
+     "lava": [{"x": 1430, "w": 120, "y": 430}, {"x": 1790, "w": 120, "y": 430}]},
+    # --- 14. CLOUD NINE: sky staircase. 3 solid puffs + 2 fragile crowns, pad row. ---
     {"name": "Cloud Nine", "top": (120, 170, 230), "bot": (200, 225, 245),
      "plat": (245, 248, 255), "glow": (255, 255, 220), "deco": "sky", "w": 3600, "wind": 40,
+     "skin": "cloud",
      "main": {"x": 900, "w": 1800, "y": 430},
-     "plats": [{"x": 1050, "w": 120, "y": 340}, {"x": 1320, "w": 120, "y": 280},
-               {"x": 1590, "w": 120, "y": 220}, {"x": 1860, "w": 120, "y": 220}, {"x": 2130, "w": 120, "y": 280}],
+     "plats": [{"x": 1050, "w": 130, "y": 340}, {"x": 1320, "w": 130, "y": 280},
+               {"x": 2120, "w": 130, "y": 280}],
      "pads": [{"x": 1300, "w": 80, "y": 430, "pad": 780}, {"x": 1720, "w": 80, "y": 430, "pad": 780},
               {"x": 2140, "w": 80, "y": 430, "pad": 780}],
-     "breakables": [{"x": 1590, "w": 120, "y": 220, "hp": 2},
-                    {"x": 1860, "w": 120, "y": 220, "hp": 2}]},
+     "breakables": [{"x": 1585, "w": 130, "y": 220, "hp": 2},
+                    {"x": 1855, "w": 130, "y": 220, "hp": 2}]},
+    # --- 15. THE RIFT: collapsing apex. Everything hazards on the biggest stage. ---
     {"name": "The Rift", "top": (5, 3, 12), "bot": (40, 10, 50),
      "plat": (90, 60, 120), "glow": (255, 70, 90), "deco": "void", "w": 4200, "gravm": 0.9,
+     "skin": "rift",
      "main": {"x": 1200, "w": 1800, "y": 430},
-     "plats": [{"x": 1500, "w": 150, "y": 300}, {"x": 2025, "w": 150, "y": 200}, {"x": 2600, "w": 150, "y": 300}],
+     "plats": [{"x": 1480, "w": 160, "y": 300}, {"x": 2560, "w": 160, "y": 300}],
      "spikes": [{"x": 1550, "w": 90, "y": 430}, {"x": 2260, "w": 90, "y": 430}],
-     "breakables": [{"x": 2025, "w": 150, "y": 200, "hp": 3}],
+     "breakables": [{"x": 2020, "w": 160, "y": 200, "hp": 3}],
      "lava": [{"x": 1900, "w": 110, "y": 430}]},
+    # --- 16. HARBOR TOWN: clean plaza duel. Two stone balconies, no hazards. ---
     {"name": "Harbor Town", "top": (90, 150, 220), "bot": (180, 220, 240),
      "plat": (190, 150, 110), "glow": (255, 220, 150), "deco": "sky", "w": 3000,
+     "skin": "harbor",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 1000, "w": 150, "y": 300}, {"x": 1850, "w": 150, "y": 300}],
-     "breakables": [{"x": 1850, "w": 150, "y": 300, "hp": 2}]},
+     "plats": [{"x": 950, "w": 170, "y": 300}, {"x": 1880, "w": 170, "y": 300}]},
+    # --- 17. WORLD TREE: canopy crossing. Solid bough + fragile bloom + bounce bloom. ---
     {"name": "World Tree", "top": (80, 160, 220), "bot": (150, 220, 180),
      "plat": (150, 110, 70), "glow": (150, 255, 150), "deco": "fungus", "w": 3000,
+     "skin": "bark",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 950, "w": 140, "y": 310}, {"x": 1910, "w": 140, "y": 310}],
+     "plats": [{"x": 900, "w": 150, "y": 310}],
      "pads": [{"x": 1460, "w": 80, "y": 430, "pad": 780}],
-     "breakables": [{"x": 1910, "w": 140, "y": 310, "hp": 2}]},
+     "breakables": [{"x": 1950, "w": 150, "y": 310, "hp": 2}]},
+    # --- 18. SUNSET KEEP: rooftop duel. Crumbing west parapet, solid east tower. ---
     {"name": "Sunset Keep", "top": (240, 120, 80), "bot": (120, 60, 140),
      "plat": (150, 100, 60), "glow": (255, 150, 90), "deco": "sky", "w": 3000,
+     "skin": "keep",
      "main": {"x": 600, "w": 1800, "y": 430},
-     "plats": [{"x": 1000, "w": 150, "y": 290}, {"x": 1850, "w": 150, "y": 290}],
-     "breakables": [{"x": 1000, "w": 150, "y": 290, "hp": 2}]},
+     "plats": [{"x": 1850, "w": 160, "y": 290}],
+     "breakables": [{"x": 990, "w": 160, "y": 290, "hp": 2}]},
 ]
 BLAST = {"l": -60, "r": W + 60, "t": -100, "b": H + 60}
 
@@ -1226,11 +1273,14 @@ class Game:
         self.net_frame = 0
         self.net_last_rx = 0.0
         self.net_local_ip = ""
+        self.net_link = None
+        self.net_room = ""
         self.net_outbox = []
         self.net_in_sq = 0
         self.net_heard_guest = False
         self.ip_buf = ""
         self.ip_err = ""
+        self.ip_mode = "ip"
         self.gpick_idx = 0
         self.online_buttons = []
         self.gpick_cards = []
@@ -1945,6 +1995,14 @@ class Game:
             return
         if self.net_is_host():
             self.net_handle_host_msgs()
+            # relay hello is best-effort over the public broker: resend it
+            # until the guest's inputs arrive (they set net_heard_guest).
+            if (self.state == "fight" and self.net_guest_present()
+                    and not getattr(self, "net_heard_guest", False)):
+                now = time.time()
+                if now - getattr(self, "net_hello_wall", 0) > 1.0:
+                    self.net_hello_wall = now
+                    self.net_send_hello()
         if self.net_guest_present():
             self.net_apply_guest_inputs(dt)
         else:
@@ -1953,6 +2011,19 @@ class Game:
         self.update_fighter(cpu, p1, dt)
         self.update_projs(dt)
         self.update_fx(dt)
+        # breakable terrain: collapse, then regenerate after 12s
+        for b in getattr(self, "brk", []):
+            if b["hp"] <= 0:
+                b["regen"] -= dt
+                if b["regen"] <= 0:
+                    st0 = STAGES[self.stage_idx]
+                    maxhp = next((d["hp"] for d in st0.get("breakables", [])
+                                  if d["x"] == b["x"] and d["y"] == b["y"]), 3)
+                    b["hp"] = maxhp
+                    b["regen"] = 0.0
+                    self.ring(b["x"] + b["w"] / 2, b["y"], (255, 220, 150))
+                    self.float_text("RESTORED", b["x"] + b["w"] / 2, b["y"] - 24,
+                                    (255, 220, 150))
         # item drops: spawn over time, pickup on touch
         self.drop_t -= dt
         if self.drop_t <= 0:
@@ -2201,6 +2272,40 @@ class Game:
             if btn == P["confirm"] or btn == P["back"]:
                 self.state = "title"
             return True
+        if self.state == "online":
+            if btn == P["confirm"]:
+                if self.menu_idx == 0:
+                    if self.net_start_host():
+                        self.goto_select()
+                elif self.menu_idx == 1:
+                    self.state = "ip"
+                    self.ip_buf = ""
+                    self.ip_err = ""
+                    self.ip_mode = "ip"
+                else:
+                    self.state = "net"
+                    self.menu_idx = 0
+            elif btn == P["back"]:
+                self.state = "title"
+                self.menu_idx = 2
+            return True
+        if self.state == "net":
+            if btn == P["confirm"]:
+                if self.menu_idx == 0:
+                    if self.net_start_host(link="relay"):
+                        self.goto_select()
+                else:
+                    self.state = "ip"
+                    self.ip_buf = ""
+                    self.ip_err = ""
+                    self.ip_mode = "room"
+            elif btn == P["back"]:
+                self.state = "online"
+            return True
+        if self.state == "ip":
+            if btn == P["back"]:
+                self.state = "online"
+            return True
         if self.state == "select":
             s = self.sel
             if btn == P["confirm"]:
@@ -2305,6 +2410,11 @@ class Game:
                 self.menu_idx = (self.menu_idx + 1) % 4
         elif self.state == "online":
             if hy > 0:
+                self.menu_idx = (self.menu_idx - 1) % 3
+            elif hy < 0:
+                self.menu_idx = (self.menu_idx + 1) % 3
+        elif self.state == "net":
+            if hy > 0:
                 self.menu_idx = (self.menu_idx - 1) % 2
             elif hy < 0:
                 self.menu_idx = (self.menu_idx + 1) % 2
@@ -2359,22 +2469,70 @@ class Game:
     def net_guest_present(self):
         return self.net_is_host() and self.net_peer is not None and not self.net_peer.dead
 
-    def net_start_host(self):
+    def net_start_host(self, link="lan"):
         try:
             if self.net_listen is not None:
                 try:
                     self.net_listen.close()
                 except Exception:
                     pass
-            self.net_listen = netplay.host_socket()
+                self.net_listen = None
+            self.net_stop_peer_only()
+            if link == "relay":
+                if netrelay is None or not netrelay.available():
+                    self.ip_err = "need: pip install paho-mqtt"
+                    return False
+                code = netrelay.make_code()
+                peer = netrelay.RelayPeer(code, "host")
+                err = peer.connect()
+                if err:
+                    self.ip_err = err
+                    return False
+                self.net_peer = peer
+                self.net_link = "relay"
+                self.net_room = code
+            else:
+                self.net_listen = netplay.host_socket()
+                self.net_link = "lan"
+                self.net_room = ""
             self.net_role = "host"
-            self.net_peer = None
+            self.net_peer = self.net_peer if link == "relay" else None
             self.net_guest_cid = None
             self.net_local_ip = netplay.local_ip()
             return True
         except Exception:
             self.net_listen = None
+            self.net_role = None
             return False
+
+    def net_stop_peer_only(self):
+        try:
+            if self.net_peer is not None:
+                self.net_peer.close()
+        except Exception:
+            pass
+        self.net_peer = None
+
+    def net_relay_join(self, code):
+        code = "".join(ch for ch in code.upper() if ch.isalnum())[:8]
+        if netrelay is None or not netrelay.available():
+            self.ip_err = "need: pip install paho-mqtt"
+            return False
+        if len(code) < 3:
+            self.ip_err = "room code too short"
+            return False
+        peer = netrelay.RelayPeer(code, "guest")
+        err = peer.connect()
+        if err:
+            self.ip_err = err
+            return False
+        self.net_stop_peer_only()
+        self.net_peer = peer
+        self.net_role = "guest"
+        self.net_link = "relay"
+        self.net_room = code
+        self.net_last_rx = self.t_global
+        return True
 
     def net_stop(self):
         try:
@@ -2396,6 +2554,8 @@ class Game:
         self.net_peer = None
         self.net_listen = None
         self.net_guest_cid = None
+        self.net_link = None
+        self.net_room = ""
         self.net_inputs = {"move": 0, "shield": False, "acts": []}
         self.net_events = []
 
@@ -2715,7 +2875,7 @@ class Game:
     def net_apply_snap(self, m):
         if len(self.fighters) != 2:
             return
-        for i, key in (("p1", 0), ("p2", 1)):
+        for key, i in (("p1", 0), ("p2", 1)):
             d = m.get(key)
             if not isinstance(d, dict):
                 return
@@ -3683,12 +3843,646 @@ class Game:
             yy = y0 + j * j * 14
             pygame.draw.line(self.screen, col, (0, yy), (W, yy), 1)
 
+    # ================= PER-STAGE BACKGROUNDS (18 unique arenas) =================
+    def _bg_gear(self, cx, cy, r, ang, col, teeth=8, hole=True):
+        for i in range(teeth):
+            a = ang + i * 6.283 / teeth
+            tx, ty = cx + math.cos(a) * r, cy + math.sin(a) * r
+            pygame.draw.circle(self.screen, col, (int(tx), int(ty)), max(3, int(r * 0.22)))
+        pygame.draw.circle(self.screen, col, (int(cx), int(cy)), int(r))
+        if hole:
+            pygame.draw.circle(self.screen, (12, 10, 12), (int(cx), int(cy)), max(3, int(r * 0.38)))
+
+    def _bg_stars(self, camx, t, n, par=0.1, seed=0):
+        for i in range(n):
+            x = ((i * 137 + seed * 61 - (camx * par if i % 2 == 0 else 0)) % (W + 100)) - 50
+            y = (i * 89 + seed * 37) % H
+            tw = 0.4 + 0.6 * abs(math.sin(t * 1.5 + i * 1.3 + seed))
+            c = int(120 + 120 * tw)
+            pygame.draw.circle(self.screen, (c, c, min(255, c + 40)), (int(x), int(y)), 1 + (i % 2))
+
+    def _bg_ember_arena(self, st, camx, fx, mx, t, L):
+        pygame.draw.polygon(self.screen, (30, 8, 12), [(fx - 100, H), (fx + 140, 300), (fx + 380, H)])
+        pygame.draw.polygon(self.screen, (26, 10, 16), [(fx + 560, H), (fx + 810, 330), (fx + 1060, H)])
+        pygame.draw.polygon(self.screen, (255, 110, 40),
+                            [(fx + 150, 300), (fx + 165, 268), (fx + 180, 300)])
+        pygame.draw.circle(L, (255, 120, 50, 70), (int(fx + 165), 292), 26)
+        pygame.draw.ellipse(L, (255, 110, 40, 60), (-40, H - 26, W + 80, 40))
+        for i in range(3):
+            sx = fx + 165 + math.sin(t * 0.7 + i * 2.1) * 26
+            sy = 250 - ((t * 26 + i * 90) % 240)
+            pygame.draw.circle(L, (90, 70, 70, 90), (int(sx), int(sy)), 16 + i * 5)
+        # shattered obsidian arch + floating shards
+        pygame.draw.arc(self.screen, (22, 10, 14), (mx + 330, 150, 300, 260), 0.2, 2.9, 14)
+        pygame.draw.arc(self.screen, (255, 120, 50), (mx + 330, 150, 300, 260), 0.9, 1.6, 2)
+        for i in range(4):
+            sx = 180 + i * 200 - camx * 0.55 + math.sin(t * 0.6 + i * 2.0) * 18
+            sy = 170 + (i % 2) * 70 + math.sin(t * 0.9 + i) * 10
+            pygame.draw.polygon(self.screen, (45, 20, 18),
+                                [(sx, sy - 9), (sx + 7, sy), (sx, sy + 9), (sx - 7, sy)])
+        pygame.draw.polygon(self.screen, (38, 12, 14), [(mx - 200, H), (mx + 60, 380), (mx + 320, H)])
+        pygame.draw.polygon(self.screen, (38, 12, 14), [(mx + 700, H), (mx + 980, 400), (mx + 1260, H)])
+        pts = [(x, H - 14 + math.sin(x * 0.05 + t * 3) * 4) for x in range(-20, W + 20, 24)]
+        pygame.draw.lines(self.screen, (255, 160, 70), False, pts, 2)
+        self.draw_floor_grid(H - 6, (120, 50, 25))
+        self.draw_cube(220 - camx * 0.4, 180 + math.sin(t * 0.8) * 10, 34, t * 0.5, (60, 25, 20))
+        self.draw_cube(760 - camx * 0.4, 130 + math.cos(t * 0.6) * 12, 24, -t * 0.4, (80, 32, 22))
+        if len(self.parts) < 110:
+            for _ in range(2):
+                self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                           random.uniform(-24, 24), random.uniform(-150, -50),
+                                           random.uniform(1.2, 2.4),
+                                           random.choice([(255, 140, 50), (255, 90, 40), (120, 110, 110)]),
+                                           random.randint(2, 4), grav=-60, glow=True))
+
+    def _bg_sky_battlefield(self, st, camx, fx, mx, t, L):
+        sunx = int(800 - camx * 0.15)
+        pygame.draw.circle(L, (255, 246, 200, 70), (sunx, 90), 64)
+        pygame.draw.circle(self.screen, (255, 246, 200), (sunx, 90), 34)
+        for ri in range(3):
+            ang = 0.9 + ri * 0.35 + math.sin(t * 0.3) * 0.05
+            pygame.draw.line(L, (255, 250, 220, 26), (sunx, 90),
+                             (int(sunx + math.cos(ang) * 700), int(90 + math.sin(ang) * 700)), 34 - ri * 8)
+        # floating ruin islands with waterfalls
+        for i, (ix, iy, iw) in enumerate(((180, 150, 130), (560, 100, 90), (830, 190, 110))):
+            bx = ix - camx * 0.3 + math.sin(t * 0.5 + i * 2.0) * 10
+            by = iy + math.sin(t * 0.7 + i) * 6
+            pygame.draw.ellipse(self.screen, (110, 150, 130), (bx - iw / 2, by - 14, iw, 26))
+            pygame.draw.ellipse(self.screen, (150, 190, 150), (bx - iw / 2 + 8, by - 18, iw - 16, 18))
+            pygame.draw.polygon(self.screen, (90, 115, 140),
+                                [(bx - iw / 2 + 12, by + 8), (bx + iw / 2 - 12, by + 8), (bx, by + 52)])
+            pygame.draw.line(self.screen, (200, 230, 245), (bx + iw / 4, by + 10), (bx + iw / 4, by + 90), 3)
+            pygame.draw.rect(self.screen, (140, 150, 160), (bx - 10, by - 44, 20, 30))
+        for layer in range(2):
+            spd = 14 + layer * 12
+            for i in range(4):
+                x = (i * 300 + layer * 150 - t * spd - camx * (0.4 + 0.15 * layer)) % (W + 320) - 160
+                y = 60 + layer * 90 + i * 38
+                sc = 0.7 + layer * 0.5
+                for ox2, s2 in ((0, 46), (38, 34), (-38, 32)):
+                    pygame.draw.ellipse(self.screen, (196, 212, 232),
+                                        (int(x + ox2 * sc - s2 * sc), int(y - s2 * sc // 2 + 10 * sc),
+                                         int(s2 * 2 * sc), int(s2 * sc)))
+                    pygame.draw.ellipse(self.screen, (255, 255, 255),
+                                        (int(x + ox2 * sc - s2 * sc), int(y - s2 * sc // 2),
+                                         int(s2 * 2 * sc), int(s2 * sc)))
+        pygame.draw.polygon(self.screen, (70, 110, 150), [(mx - 200, H), (mx + 180, 340), (mx + 560, H)])
+        pygame.draw.polygon(self.screen, (235, 245, 255), [(mx + 180, 340), (mx + 150, 372), (mx + 210, 372)])
+        pygame.draw.polygon(self.screen, (60, 100, 140), [(mx + 620, H), (mx + 820, 360), (mx + 1160, H)])
+        pygame.draw.polygon(self.screen, (240, 248, 255), [(mx + 820, 360), (mx + 796, 388), (mx + 844, 388)])
+        for cxi in range(6):
+            clx = cxi * 200 - 100 - camx * 0.2 + math.sin(t * 0.4 + cxi) * 12
+            pygame.draw.ellipse(self.screen, (225, 235, 248), (clx - 90, 392, 180, 30))
+            pygame.draw.ellipse(self.screen, (255, 255, 255), (clx - 70, 386, 140, 24))
+        for i in range(2):
+            bx = (t * (40 + i * 18) + i * 500) % (W + 100) - 50
+            by = 130 + i * 60 + math.sin(t * 2 + i * 3) * 12
+            pygame.draw.arc(self.screen, (40, 50, 70), (int(bx - 10), int(by - 4), 20, 10), 3.4, 6.0, 2)
+        if len(self.parts) < 110 and random.random() < 0.25:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(300, H),
+                                       random.uniform(-40, -10), random.uniform(-16, -4),
+                                       random.uniform(2.0, 3.5), (255, 255, 255), 2, grav=0, glow=True))
+
+    def _bg_void_final(self, st, camx, fx, mx, t, L):
+        for i, (nx, ny, nr, col) in enumerate(((240, 150, 150, (120, 60, 180)),
+                                               (720, 380, 170, (60, 40, 140)),
+                                               (500, 120, 110, (150, 60, 160)))):
+            pygame.draw.circle(L, (*col, 46),
+                               (int(nx - camx * 0.25 + math.sin(t * 0.3 + i * 2) * 20), int(ny)), nr)
+        self._bg_stars(camx, t, 110, par=0.1)
+        # twin monoliths + glowing runes
+        for i, mox in enumerate((200, 700)):
+            bx = mox - camx * 0.35
+            pygame.draw.polygon(self.screen, (22, 14, 34),
+                                [(bx - 34, H), (bx - 22, 190 + i * 30), (bx + 22, 190 + i * 30), (bx + 34, H)])
+            for j in range(3):
+                ry = 260 + j * 60 + i * 20
+                on = int(t * 2 + i + j) % 2 == 0
+                pygame.draw.circle(self.screen, (200, 130, 255) if on else (90, 60, 130),
+                                   (int(bx), int(ry)), 4)
+                pygame.draw.circle(L, (190, 130, 255, 60), (int(bx), int(ry)), 12)
+        cx, cy = W // 2 - camx * 0.3, H // 2 - 20
+        for r, al in ((150, 60), (200, 40), (250, 26)):
+            pygame.draw.arc(self.screen, (150, 90, 220),
+                            (cx - r, cy - r // 2, r * 2, r), 0.3 + t * 0.25, 2.6 + t * 0.25, 3)
+            _ = al
+        for i in range(5):
+            sx = 120 + i * 180 - camx * 0.6 + math.sin(t * 0.5 + i * 1.9) * 24
+            sy = 150 + (i % 3) * 90 + math.sin(t * 0.8 + i) * 14
+            pygame.draw.polygon(self.screen, (90, 70, 130),
+                                [(sx, sy - 10), (sx + 8, sy), (sx, sy + 10), (sx - 8, sy)])
+            pygame.draw.line(self.screen, (180, 140, 230), (sx, sy - 10), (sx + 8, sy), 1)
+        self.draw_floor_grid(H - 6, (50, 30, 80))
+        self.draw_cube(300 - camx * 0.5, 200 + math.sin(t * 0.7) * 12, 30, t * 0.45, (90, 60, 140))
+        self.draw_cube(660 - camx * 0.5, 150 + math.cos(t * 0.5) * 10, 22, -t * 0.55, (70, 45, 120))
+        if len(self.parts) < 110 and random.random() < 0.5:
+            self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                       random.uniform(-16, 16), random.uniform(-70, -25),
+                                       random.uniform(1.5, 3.0), (190, 150, 255), 3, grav=-30, glow=True))
+
+    def _bg_fungal_hollow(self, st, camx, fx, mx, t, L):
+        fx2 = -camx * 0.3
+        pygame.draw.ellipse(L, (60, 120, 90, 50), (W // 2 - 320, H - 160, 640, 170))
+        for i, (mx2, mh, mr) in enumerate(((140, 260, 46), (700, 200, 60), (1050, 280, 40))):
+            bx = fx2 + mx2 + math.sin(t * 0.4 + i) * 8
+            pygame.draw.rect(self.screen, (50, 70, 60), (bx - 12, H - mh, 24, mh + 40))
+            pygame.draw.rect(self.screen, (70, 95, 80), (bx - 12, H - mh, 8, mh + 40))
+            pygame.draw.ellipse(self.screen, (120, 70, 150), (bx - mr, H - mh - 34, mr * 2, 44))
+            pygame.draw.ellipse(self.screen, (150, 95, 175), (bx - mr, H - mh - 34, mr * 2, 18))
+            for sxr in (-mr // 2, 0, mr // 2):
+                pygame.draw.ellipse(self.screen, (225, 200, 235), (bx + sxr - 7, H - mh - 26, 14, 10))
+            pygame.draw.circle(L, (190, 130, 230, 50), (int(bx), int(H - mh - 10)), mr)
+        for i in range(7):
+            bx = (i * 150 + 40 - camx * 0.5) % (W + 80) - 40
+            pygame.draw.ellipse(self.screen, (130, 90, 160), (bx - 12, H - 42, 24, 16))
+            pygame.draw.rect(self.screen, (60, 80, 66), (bx - 3, H - 32, 6, 14))
+            pygame.draw.circle(L, (190, 160, 230, 40), (int(bx), int(H - 40)), 10)
+        for i in range(4):
+            vx = 120 + i * 220 - camx * 0.15
+            sway = math.sin(t * 0.9 + i * 1.7) * 14
+            pygame.draw.line(self.screen, (45, 90, 60), (vx, 0), (vx + sway, 150 + i * 22), 3)
+            pygame.draw.circle(self.screen, (170, 255, 170), (int(vx + sway), int(150 + i * 22)), 4)
+            pygame.draw.circle(L, (170, 255, 170, 70), (int(vx + sway), int(150 + i * 22)), 12)
+        pygame.draw.ellipse(L, (150, 200, 170, 36), (0, H - 120, W, 60))
+        if len(self.parts) < 110 and random.random() < 0.5:
+            self.parts.append(Particle(random.uniform(0, W) + camx * 0.5, H + 6,
+                                       random.uniform(-20, 20), random.uniform(-60, -20),
+                                       random.uniform(1.5, 3.0), (190, 230, 160), 3, grav=-30, glow=True))
+
+    def _bg_storm_spire(self, st, camx, fx, mx, t, L):
+        # colossal spire + lit windows
+        sx = 640 - camx * 0.3
+        pygame.draw.polygon(self.screen, (36, 44, 66),
+                            [(sx - 90, H), (sx - 46, 90), (sx + 46, 90), (sx + 90, H)])
+        pygame.draw.polygon(self.screen, (30, 36, 56),
+                            [(sx - 46, 90), (sx, 40), (sx + 46, 90)])
+        pygame.draw.line(self.screen, (255, 240, 150), (sx, 40), (sx, 18), 2)
+        pygame.draw.circle(L, (255, 240, 150, 80), (int(sx), 16), 10)
+        for j in range(5):
+            wy = 140 + j * 62
+            on = int(t * 1.5 + j) % 2 == 0
+            pygame.draw.rect(self.screen, (255, 235, 150) if on else (70, 80, 105),
+                             (sx - 14, wy, 28, 10))
+        for i in range(3):
+            cx2 = 200 + i * 300 + math.sin(t * 0.5 + i * 2) * 30 - camx * 0.35
+            pygame.draw.ellipse(self.screen, (70, 80, 110), (cx2 - 90, 60 + i * 40, 180, 44))
+            pygame.draw.ellipse(self.screen, (50, 58, 86), (cx2 - 70, 74 + i * 40, 140, 30))
+        # lightning bolt + flash
+        if random.random() < 0.012:
+            self.parts.append(Particle(random.uniform(100, W - 100), 0, 0, 0, 0.12,
+                                       (255, 255, 255), 60, grav=0, glow=True))
+            bx = random.uniform(120, W - 120)
+            pts = [(bx, 0)]
+            for k in range(1, 7):
+                pts.append((bx + random.uniform(-36, 36), k * 60))
+            pygame.draw.lines(self.screen, (240, 245, 255), False, pts, 3)
+            pygame.draw.lines(L, (200, 210, 255, 90), False, pts, 7)
+        for i in range(24):
+            rx = (i * 173 + t * 900) % (W + 40) - 20
+            ry = (i * 311 + t * 1400) % H
+            pygame.draw.line(self.screen, (170, 190, 220), (rx, ry), (rx - 4, ry + 14), 1)
+        if len(self.parts) < 110 and random.random() < 0.3:
+            self.parts.append(Particle(random.uniform(0, W), -6,
+                                       random.uniform(-60, -20), random.uniform(300, 420),
+                                       0.8, (170, 190, 230), 2, grav=0))
+
+    def _bg_tide_vault(self, st, camx, fx, mx, t, L):
+        for ri in range(3):
+            bx = 260 + ri * 220 - camx * 0.1
+            pygame.draw.polygon(L, (140, 220, 255, 30),
+                                [(bx, 0), (bx + 90, 0), (bx - 40, H), (bx - 130, H)])
+        for i, (px, ph) in enumerate(((160, 300), (430, 220), (700, 330), (900, 200))):
+            bx = px - camx * 0.3 + math.sin(t * 0.4 + i) * 6
+            pygame.draw.rect(self.screen, (45, 95, 120), (bx - 18, H - ph, 36, ph))
+            pygame.draw.rect(self.screen, (70, 135, 160), (bx - 18, H - ph, 36, 10))
+            pygame.draw.rect(self.screen, (35, 75, 100), (bx - 24, H - ph - 12, 48, 14))
+        pygame.draw.arc(self.screen, (45, 95, 120), (300 - camx * 0.3, 190, 320, 200), 0.1, 3.0, 18)
+        pygame.draw.ellipse(self.screen, (190, 160, 110), (-60, H - 40, W + 120, 60))
+        pygame.draw.ellipse(self.screen, (220, 190, 140), (-60, H - 40, W + 120, 22))
+        for i in range(5):
+            gx = 100 + i * 180 - camx * 0.4
+            sway = math.sin(t * 1.4 + i * 2.2) * 16
+            pygame.draw.line(self.screen, (60, 150, 120), (gx, H - 30), (gx + sway, H - 110 - i * 8), 4)
+        if len(self.parts) < 120 and random.random() < 0.6:
+            self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                       random.uniform(-14, 14), random.uniform(-90, -30),
+                                       random.uniform(1.5, 3.2), (170, 225, 255), 3, grav=-40, glow=True))
+        if len(self.parts) < 120 and random.random() < 0.25:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(200, H),
+                                       random.uniform(-10, 10), random.uniform(-20, -6),
+                                       random.uniform(2.0, 4.0), (150, 255, 220), 2, grav=0, glow=True))
+
+    def _bg_iron_foundry(self, st, camx, fx, mx, t, L):
+        for i, stx in enumerate((240, 640)):
+            bx = stx - camx * 0.3
+            pygame.draw.rect(self.screen, (40, 30, 30), (bx - 26, 190, 52, H - 190))
+            pygame.draw.rect(self.screen, (58, 44, 42), (bx - 26, 190, 52, 14))
+            pygame.draw.rect(self.screen, (30, 22, 22), (bx - 34, 176, 68, 16))
+            for k in range(2):
+                sy = 150 - ((t * 30 + i * 80 + k * 60) % 160)
+                pygame.draw.circle(L, (110, 95, 90, 80), (int(bx + math.sin(t + k) * 10), int(sy)), 14 + k * 4)
+        self._bg_gear(480 - camx * 0.4, 330, 56, t * 0.5, (52, 44, 46))
+        self._bg_gear(600 - camx * 0.4, 250, 34, -t * 0.8, (66, 56, 56))
+        self._bg_gear(120 - camx * 0.4, 140, 26, t * 0.7, (52, 44, 46))
+        for i in range(3):
+            fx0 = 300 + i * 170 - camx * 0.2
+            pygame.draw.rect(self.screen, (25, 14, 12), (fx0 - 40, H - 90, 80, 40))
+            flick = 0.7 + 0.3 * math.sin(t * 9 + i * 2.4)
+            pygame.draw.rect(self.screen, (255, int(130 * flick), 50), (fx0 - 30, H - 78, 60, 16))
+            pygame.draw.circle(L, (255, 130, 50, 70), (int(fx0), int(H - 70)), 30)
+        for i in range(4):
+            chx = 140 + i * 220 - camx * 0.45 + math.sin(t * 0.8 + i) * 6
+            pygame.draw.line(self.screen, (60, 58, 62), (chx, 0), (chx, 200 + (i % 2) * 60), 3)
+            pygame.draw.circle(self.screen, (90, 88, 92), (int(chx), int(200 + (i % 2) * 60)), 6)
+        pygame.draw.ellipse(L, (255, 120, 50, 46), (-40, H - 26, W + 80, 40))
+        self.draw_floor_grid(H - 6, (110, 70, 50))
+        if len(self.parts) < 110:
+            for _ in range(2):
+                self.parts.append(Particle(random.uniform(0, W), H - 40,
+                                           random.uniform(-30, 30), random.uniform(-220, -80),
+                                           random.uniform(0.6, 1.4),
+                                           random.choice([(255, 170, 60), (255, 120, 50), (200, 200, 200)]),
+                                           random.randint(2, 4), grav=-60, glow=True))
+
+    def _bg_thorn_garden(self, st, camx, fx, mx, t, L):
+        moonx = int(180 - camx * 0.1)
+        pygame.draw.circle(L, (220, 170, 255, 60), (moonx, 110), 52)
+        pygame.draw.circle(self.screen, (235, 220, 245), (moonx, 110), 30)
+        for i in range(3):
+            vx = 200 + i * 260 - camx * 0.3
+            pygame.draw.arc(self.screen, (50, 90, 55), (vx - 120, 200 + i * 40, 240, 260),
+                            0.4 + math.sin(t * 0.4 + i) * 0.1, 2.6, 10)
+            pygame.draw.arc(self.screen, (70, 130, 75), (vx - 120, 200 + i * 40, 240, 260),
+                            0.9 + math.sin(t * 0.4 + i) * 0.1, 1.9, 3)
+            for th in range(5):
+                a = 0.6 + th * 0.4 + math.sin(t * 0.4 + i) * 0.05
+                tx = vx - 120 + 120 + math.cos(a) * 120
+                tyy = 200 + i * 40 + 130 + math.sin(a) * 130
+                pygame.draw.polygon(self.screen, (60, 100, 60),
+                                    [(tx, tyy), (tx + 12, tyy - 8), (tx + 20, tyy + 2)])
+            bx, by = vx + 60, 240 + i * 50 + math.sin(t * 0.8 + i * 2) * 6
+            pygame.draw.circle(self.screen, (210, 130, 220), (int(bx), int(by)), 9)
+            pygame.draw.circle(self.screen, (240, 190, 245), (int(bx), int(by)), 4)
+            pygame.draw.circle(L, (220, 140, 230, 70), (int(bx), int(by)), 18)
+        for cxi in range(8):
+            gx = cxi * 130 - 40 - camx * 0.4
+            pygame.draw.polygon(self.screen, (45, 85, 50), [(gx, H), (gx + 8, H - 34), (gx + 16, H)])
+        if len(self.parts) < 110 and random.random() < 0.5:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(100, H),
+                                       random.uniform(-24, -6), random.uniform(-14, 6),
+                                       random.uniform(2.0, 4.0), (230, 170, 230), 2, grav=0, glow=True))
+        if len(self.parts) < 110 and random.random() < 0.3:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(150, H),
+                                       random.uniform(-12, 12), random.uniform(-18, 18),
+                                       random.uniform(1.5, 3.0), (200, 255, 170), 2, grav=0, glow=True))
+
+    def _bg_glacier(self, st, camx, fx, mx, t, L):
+        moonx = int(760 - camx * 0.12)
+        pygame.draw.circle(L, (220, 240, 255, 70), (moonx, 100), 56)
+        pygame.draw.circle(self.screen, (240, 248, 255), (moonx, 100), 32)
+        for li in range(3):
+            for x in range(0, W + 20, 18):
+                y = 70 + li * 46 + math.sin(x * 0.012 + t * (0.5 + li * 0.2) + li * 2.0) * 26
+                cols = [(120, 255, 170), (130, 200, 255), (220, 160, 255)]
+                pygame.draw.circle(L, (*cols[li], 26), (x, int(y)), 9)
+                if x % 54 == 0:
+                    pygame.draw.circle(self.screen, cols[li], (x, int(y)), 2)
+        pygame.draw.polygon(self.screen, (90, 130, 165), [(mx - 200, H), (mx + 180, 330), (mx + 560, H)])
+        pygame.draw.polygon(self.screen, (240, 248, 255), [(mx + 180, 330), (mx + 150, 362), (mx + 210, 362)])
+        pygame.draw.polygon(self.screen, (75, 115, 155), [(mx + 620, H), (mx + 820, 350), (mx + 1160, H)])
+        pygame.draw.polygon(self.screen, (245, 250, 255), [(mx + 820, 350), (mx + 796, 378), (mx + 844, 378)])
+        for i in range(5):
+            cx0 = 90 + i * 190 - camx * 0.5
+            ch = 60 + (i % 3) * 30
+            pygame.draw.polygon(self.screen, (170, 215, 240),
+                                [(cx0 - 16, H), (cx0, H - ch), (cx0 + 16, H)])
+            pygame.draw.polygon(self.screen, (225, 245, 255),
+                                [(cx0 - 6, H - ch * 0.4), (cx0, H - ch), (cx0 + 6, H - ch * 0.4)])
+            pygame.draw.circle(L, (180, 225, 255, 40), (int(cx0), int(H - ch)), 16)
+        if len(self.parts) < 130:
+            for _ in range(2):
+                self.parts.append(Particle(random.uniform(0, W), -6,
+                                           random.uniform(-40, -5), random.uniform(40, 110),
+                                           random.uniform(1.5, 3.0), (240, 248, 255), 2, grav=60))
+
+    def _bg_dune_sea(self, st, camx, fx, mx, t, L):
+        sunx = int(480 - camx * 0.1)
+        pygame.draw.circle(L, (255, 220, 150, 80), (sunx, 130), 80)
+        pygame.draw.circle(self.screen, (255, 240, 200), (sunx, 130), 44)
+        for i, (dy, col) in enumerate(((330, (200, 150, 95)), (390, (220, 175, 115)), (450, (235, 200, 140)))):
+            pts = [(x, dy + math.sin(x * 0.008 + i * 2.0 + t * 0.2) * 16 - camx * 0.05 * (i + 1) % 60)
+                   for x in range(-40, W + 40, 30)]
+            pts += [(W + 40, H), (-40, H)]
+            pygame.draw.polygon(self.screen, col, pts)
+        obx = 700 - camx * 0.35
+        pygame.draw.polygon(self.screen, (120, 90, 60), [(obx - 20, H - 220), (obx + 20, H - 220),
+                                                         (obx + 30, H - 60), (obx - 30, H - 60)])
+        pygame.draw.polygon(self.screen, (150, 115, 75), [(obx - 20, H - 220), (obx + 20, H - 220),
+                                                          (obx + 14, H - 120), (obx - 14, H - 120)])
+        pygame.draw.circle(L, (255, 230, 170, 50), (int(obx), int(H - 160)), 30)
+        for i in range(3):
+            hx = 0 + ((t * (60 + i * 30) + i * 400) % (W + 200)) - 100
+            pygame.draw.line(self.screen, (240, 210, 160), (hx, 300 + i * 50), (hx + 120, 300 + i * 50), 2)
+        for i in range(2):
+            bx = (t * (40 + i * 18) + i * 500) % (W + 100) - 50
+            by = 120 + i * 50 + math.sin(t * 2 + i * 3) * 10
+            pygame.draw.arc(self.screen, (90, 70, 50), (int(bx - 10), int(by - 4), 20, 10), 3.4, 6.0, 2)
+        if len(self.parts) < 130:
+            for _ in range(3):
+                self.parts.append(Particle(random.uniform(0, W), random.uniform(200, H),
+                                           random.uniform(-260, -120), random.uniform(-24, 10),
+                                           random.uniform(0.8, 1.8), (240, 210, 160), 2, grav=0))
+
+    def _bg_hollow_star(self, st, camx, fx, mx, t, L):
+        self._bg_stars(camx, t, 110, par=0.08, seed=3)
+        pygame.draw.circle(self.screen, (70, 60, 120), (W // 2 - int(camx * 0.1), H + 320), 420)
+        pygame.draw.arc(self.screen, (150, 130, 220), (W // 2 - int(camx * 0.1) - 420, H - 100, 840, 160),
+                        3.3, 6.1, 3)
+        pygame.draw.circle(L, (150, 130, 220, 50),
+                           (W // 2 - int(camx * 0.1), H - 60), 200)
+        rx, ry = W // 2 - camx * 0.25, 150
+        pygame.draw.ellipse(self.screen, (50, 45, 70), (rx - 260, ry - 26, 520, 52), 8)
+        for i in range(6):
+            a = t * 0.2 + i * 1.047
+            bx, by = rx + math.cos(a) * 240, ry + math.sin(a) * 22
+            on = int(t * 2 + i) % 2 == 0
+            pygame.draw.circle(self.screen, (255, 120, 140) if on else (90, 80, 110),
+                               (int(bx), int(by)), 4)
+            pygame.draw.circle(L, (255, 120, 140, 70 if on else 20), (int(bx), int(by)), 12)
+        for i in range(4):
+            px = 150 + i * 220 - camx * 0.4 + math.sin(t * 0.5 + i) * 12
+            py = 300 + (i % 2) * 100 + math.cos(t * 0.4 + i * 2) * 10
+            pygame.draw.rect(self.screen, (60, 60, 80), (px - 8, py - 3, 16, 6))
+            pygame.draw.circle(L, (170, 160, 255, 40), (int(px), int(py)), 14)
+        self.draw_cube(300 - camx * 0.5, 220 + math.sin(t * 0.7) * 12, 26, t * 0.45, (80, 70, 120))
+        self.draw_cube(680 - camx * 0.5, 160 + math.cos(t * 0.5) * 10, 20, -t * 0.55, (70, 60, 110))
+        if len(self.parts) < 110 and random.random() < 0.4:
+            self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                       random.uniform(-14, 14), random.uniform(-60, -20),
+                                       random.uniform(1.5, 3.0), (180, 170, 255), 2, grav=-30, glow=True))
+
+    def _bg_clockwork(self, st, camx, fx, mx, t, L):
+        ccx, ccy = 480 - camx * 0.2, 170
+        pygame.draw.circle(self.screen, (60, 50, 42), (int(ccx), int(ccy)), 110)
+        pygame.draw.circle(self.screen, (150, 125, 90), (int(ccx), int(ccy)), 100)
+        pygame.draw.circle(self.screen, (45, 36, 30), (int(ccx), int(ccy)), 88)
+        for i in range(12):
+            a = i * 0.5236
+            tx1, ty1 = ccx + math.cos(a) * 78, ccy + math.sin(a) * 78
+            tx2, ty2 = ccx + math.cos(a) * 88, ccy + math.sin(a) * 88
+            pygame.draw.line(self.screen, (200, 175, 130), (tx1, ty1), (tx2, ty2), 4 if i % 3 == 0 else 2)
+        ha = -1.57 + (t * 0.1) % 6.283
+        ma = -1.57 + (t * 0.8) % 6.283
+        pygame.draw.line(self.screen, (240, 220, 180), (ccx, ccy),
+                         (ccx + math.cos(ha) * 44, ccy + math.sin(ha) * 44), 5)
+        pygame.draw.line(self.screen, (255, 200, 120), (ccx, ccy),
+                         (ccx + math.cos(ma) * 66, ccy + math.sin(ma) * 66), 3)
+        pygame.draw.circle(self.screen, (255, 210, 140), (int(ccx), int(ccy)), 7)
+        self._bg_gear(150 - camx * 0.35, 380, 52, t * 0.6, (70, 58, 48))
+        self._bg_gear(830 - camx * 0.35, 380, 64, -t * 0.45, (60, 50, 42))
+        self._bg_gear(830 - camx * 0.35, 380, 20, t * 0.9, (90, 75, 60))
+        for i in range(2):
+            px = 250 + i * 450 - camx * 0.3
+            pygame.draw.rect(self.screen, (50, 42, 38), (px - 14, 260, 28, H - 260))
+            pygame.draw.circle(L, (255, 200, 130, 60), (int(px), 250), 18)
+            if int(t * 1.2 + i) % 2 == 0:
+                pygame.draw.circle(L, (200, 190, 180, 60),
+                                   (int(px + math.sin(t + i) * 8), int(230 - (t * 20 + i * 50) % 60)), 12)
+        self.draw_floor_grid(H - 6, (120, 95, 70))
+        if len(self.parts) < 100 and random.random() < 0.3:
+            self.parts.append(Particle(random.uniform(0, W), H - 60,
+                                       random.uniform(-20, 20), random.uniform(-120, -50),
+                                       random.uniform(1.0, 2.0), (210, 190, 170), 3, grav=-40, glow=True))
+
+    def _bg_magma_core(self, st, camx, fx, mx, t, L):
+        for i, (bx, bw) in enumerate(((180, 70), (420, 90), (700, 70), (880, 100))):
+            cx0 = bx - camx * 0.3
+            pygame.draw.rect(self.screen, (32, 14, 14), (cx0 - bw / 2, 120 + (i % 2) * 40, bw, H))
+            pygame.draw.rect(self.screen, (52, 24, 20), (cx0 - bw / 2, 120 + (i % 2) * 40, 12, H))
+        for i, mfx in enumerate((330, 620)):
+            cx0 = mfx - camx * 0.35
+            pygame.draw.rect(self.screen, (255, 120, 40), (cx0 - 12, 60, 24, H - 60))
+            pygame.draw.rect(self.screen, (255, 200, 110), (cx0 - 5, 60, 10, H - 60))
+            for k in range(3):
+                by = 120 + ((t * 160 + i * 200 + k * 180) % (H - 160))
+                pygame.draw.circle(self.screen, (255, 230, 150), (int(cx0), int(by)), 7)
+            pygame.draw.circle(L, (255, 130, 50, 80), (int(cx0), H - 40), 46)
+        pygame.draw.ellipse(L, (255, 110, 40, 70), (-40, H - 26, W + 80, 40))
+        pts = [(x, H - 14 + math.sin(x * 0.05 + t * 3) * 4) for x in range(-20, W + 20, 24)]
+        pygame.draw.lines(self.screen, (255, 160, 70), False, pts, 2)
+        self.draw_floor_grid(H - 6, (120, 50, 25))
+        if len(self.parts) < 130:
+            for _ in range(3):
+                self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                           random.uniform(-30, 30), random.uniform(-260, -90),
+                                           random.uniform(1.0, 2.2),
+                                           random.choice([(255, 140, 50), (255, 90, 40), (255, 200, 110)]),
+                                           random.randint(2, 5), grav=-60, glow=True))
+
+    def _bg_cloud_nine(self, st, camx, fx, mx, t, L):
+        sunx = int(180 - camx * 0.12)
+        pygame.draw.circle(L, (255, 250, 220, 70), (sunx, 100), 60)
+        pygame.draw.circle(self.screen, (255, 252, 230), (sunx, 100), 32)
+        rcx, rcy = W // 2 - camx * 0.15, H + 40
+        for i, col in enumerate([(255, 120, 120), (255, 190, 120), (255, 245, 150),
+                                 (150, 235, 150), (140, 200, 255), (210, 160, 255)]):
+            pygame.draw.arc(self.screen, col, (rcx - 330 + i * 12, rcy - 330 + i * 12,
+                                               660 - i * 24, 660 - i * 24), 3.25, 6.15, 9)
+        for layer in range(2):
+            spd = 12 + layer * 10
+            for i in range(4):
+                x = (i * 300 + layer * 150 - t * spd - camx * (0.35 + 0.12 * layer)) % (W + 320) - 160
+                y = 120 + layer * 110 + i * 40
+                sc = 0.8 + layer * 0.5
+                for ox2, s2 in ((0, 52), (42, 38), (-42, 36)):
+                    pygame.draw.ellipse(self.screen, (255, 255, 255),
+                                        (int(x + ox2 * sc - s2 * sc), int(y - s2 * sc // 2),
+                                         int(s2 * 2 * sc), int(s2 * sc)))
+        for i in range(2):
+            bx = 300 + i * 380 - camx * 0.3 + math.sin(t * 0.6 + i * 3) * 14
+            by = 200 + i * 60 + math.sin(t * 0.8 + i) * 10
+            pygame.draw.ellipse(self.screen, (255, 150, 150) if i == 0 else (150, 200, 255),
+                                (bx - 16, by - 20, 32, 40))
+            pygame.draw.line(self.screen, (120, 120, 140), (bx, by + 20), (bx, by + 54), 2)
+        if len(self.parts) < 110 and random.random() < 0.4:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(0, H),
+                                       random.uniform(-16, 16), random.uniform(-30, -8),
+                                       random.uniform(1.5, 3.0), (255, 255, 255), 2, grav=0, glow=True))
+
+    def _bg_the_rift(self, st, camx, fx, mx, t, L):
+        self._bg_stars(camx, t, 80, par=0.12, seed=7)
+        rcx, rcy = W // 2 - camx * 0.2, H // 2 - 30
+        pygame.draw.circle(L, (200, 40, 80, 60), (int(rcx), int(rcy)), 190)
+        pygame.draw.circle(L, (120, 40, 180, 50), (int(rcx), int(rcy)), 130)
+        for ri, (rr, col, wd) in enumerate((((150, (255, 70, 90), 10), (195, (170, 90, 255), 7),
+                                             (240, (255, 200, 220), 4))[ri] for ri in range(3))):
+            a0 = t * (0.5 + ri * 0.25) + ri * 2.0
+            pygame.draw.arc(self.screen, col, (rcx - rr, rcy - rr // 2, rr * 2, rr), a0, a0 + 4.2, wd)
+            pygame.draw.arc(self.screen, col, (rcx - rr, rcy - rr // 2, rr * 2, rr), a0 + 3.4, a0 + 5.6, wd)
+        for i in range(9):
+            a = t * 0.4 + i * 0.698
+            dx, dy = rcx + math.cos(a) * 215, rcy + math.sin(a) * 105
+            pygame.draw.polygon(self.screen, (110, 70, 140),
+                                [(dx, dy - 8), (dx + 6, dy), (dx, dy + 8), (dx - 6, dy)])
+            pygame.draw.line(self.screen, (255, 130, 150), (dx, dy - 8), (dx + 6, dy), 1)
+        pygame.draw.ellipse(self.screen, (30, 10, 25), (-60, H - 50, W + 120, 70))
+        pts = [(x, H - 16 + math.sin(x * 0.06 + t * 4) * 4) for x in range(-20, W + 20, 26)]
+        pygame.draw.lines(self.screen, (255, 80, 100), False, pts, 2)
+        if len(self.parts) < 130 and random.random() < 0.6:
+            self.parts.append(Particle(random.uniform(0, W), H + 6,
+                                       random.uniform(-20, 20), random.uniform(-90, -30),
+                                       random.uniform(1.2, 2.6),
+                                       random.choice([(255, 90, 120), (190, 140, 255), (255, 170, 90)]),
+                                       3, grav=-40, glow=True))
+
+    def _bg_harbor_town(self, st, camx, fx, mx, t, L):
+        for i, (bx, bw, bh) in enumerate(((60, 130, 220), (220, 110, 170), (560, 140, 240), (730, 100, 180))):
+            cx0 = bx - camx * 0.3
+            pygame.draw.rect(self.screen, (48, 60, 88), (cx0, H - 120 - bh, bw, bh + 120))
+            pygame.draw.polygon(self.screen, (66, 80, 112), [(cx0 - 8, H - 120 - bh),
+                                                             (cx0 + bw / 2, H - 150 - bh), (cx0 + bw + 8, H - 120 - bh)])
+            for wx in range(3):
+                for wy in range(3):
+                    on = (wx * 3 + wy + i) % 3 != 0
+                    pygame.draw.rect(self.screen, (255, 220, 150) if on else (40, 48, 70),
+                                     (cx0 + 16 + wx * 34, H - 100 - bh + wy * 30, 18, 16))
+        # lighthouse + sweeping beam
+        lhx = 860 - camx * 0.25
+        pygame.draw.rect(self.screen, (200, 200, 210), (lhx - 16, 180, 32, H - 300))
+        pygame.draw.rect(self.screen, (200, 90, 90), (lhx - 16, 220, 32, 16))
+        pygame.draw.rect(self.screen, (200, 90, 90), (lhx - 16, 280, 32, 16))
+        pygame.draw.polygon(self.screen, (60, 60, 80), [(lhx - 22, 180), (lhx + 22, 180), (lhx, 150)])
+        pygame.draw.circle(L, (255, 240, 180, 90), (int(lhx), 168), 14)
+        ba = math.sin(t * 0.7) * 0.5
+        pygame.draw.polygon(L, (255, 244, 200, 36),
+                            [(lhx, 168), (lhx + math.cos(ba) * 700 - 60, 168 + math.sin(ba) * 700 + 120),
+                             (lhx + math.cos(ba) * 700 + 60, 168 + math.sin(ba) * 700 + 200)])
+        # masts + water
+        for i in range(2):
+            mxx = 320 + i * 260 - camx * 0.4
+            pygame.draw.line(self.screen, (70, 55, 45), (mxx, 330), (mxx, H - 90), 4)
+            pygame.draw.polygon(self.screen, (220, 120, 120),
+                                [(mxx, 340), (mxx + 44, 370), (mxx, 400)])
+        pygame.draw.rect(self.screen, (50, 110, 150), (-40, H - 90, W + 80, 90))
+        for i in range(10):
+            wx = (i * 130 + int(t * 30)) % (W + 60) - 30
+            pygame.draw.line(self.screen, (150, 210, 240), (wx, H - 60 + (i % 3) * 14),
+                             (wx + 46, H - 60 + (i % 3) * 14), 2)
+        for i in range(4):
+            lx0 = 140 + i * 200 - camx * 0.45
+            pygame.draw.circle(self.screen, (255, 210, 140), (int(lx0), H - 110), 5)
+            pygame.draw.circle(L, (255, 210, 140, 70), (int(lx0), int(H - 110)), 16)
+        for i in range(2):
+            bx = (t * 36 + i * 480) % (W + 100) - 50
+            by = 120 + i * 50 + math.sin(t * 2 + i) * 8
+            pygame.draw.arc(self.screen, (50, 60, 80), (int(bx - 10), int(by - 4), 20, 10), 3.4, 6.0, 2)
+
+    def _bg_world_tree(self, st, camx, fx, mx, t, L):
+        tx = 480 - camx * 0.2
+        pygame.draw.polygon(self.screen, (70, 55, 40),
+                            [(tx - 70, H), (tx - 34, 120), (tx + 34, 120), (tx + 70, H)])
+        pygame.draw.polygon(self.screen, (95, 75, 55),
+                            [(tx - 34, 120), (tx - 150, 40), (tx - 110, 30), (tx, 100)])
+        pygame.draw.polygon(self.screen, (95, 75, 55),
+                            [(tx + 34, 120), (tx + 160, 60), (tx + 120, 46), (tx, 100)])
+        for i in range(4):
+            by = 200 + i * 80
+            pygame.draw.line(self.screen, (55, 42, 30), (tx - 50, by), (tx + 50, by), 2)
+        for i, (cx0, cy0, cw) in enumerate(((tx - 140, 90, 300), (tx + 150, 120, 280), (tx, 30, 380))):
+            bx = cx0 - camx * 0.08 + math.sin(t * 0.5 + i * 2) * 8
+            pygame.draw.ellipse(self.screen, (60, 140, 90), (bx - cw / 2, cy0 - 40, cw, 90))
+            pygame.draw.ellipse(self.screen, (95, 185, 120), (bx - cw / 2 + 20, cy0 - 52, cw - 40, 60))
+            for g in range(3):
+                gx = bx - cw / 3 + g * cw / 3
+                pygame.draw.ellipse(self.screen, (150, 230, 160), (gx - 14, cy0 - 30, 28, 18))
+        for ri in range(2):
+            bx = tx - 60 + ri * 120
+            pygame.draw.polygon(L, (220, 255, 200, 26), [(bx, 60), (bx + 50, 60), (bx - 30, H), (bx - 80, H)])
+        for cxi in range(5):
+            clx = cxi * 220 - 60 - camx * 0.25 + math.sin(t * 0.4 + cxi) * 10
+            pygame.draw.ellipse(self.screen, (120, 190, 150), (clx - 60, H - 70, 120, 30))
+        if len(self.parts) < 120 and random.random() < 0.55:
+            self.parts.append(Particle(random.uniform(0, W), -6,
+                                       random.uniform(-40, 10), random.uniform(30, 80),
+                                       random.uniform(2.0, 4.0),
+                                       random.choice([(150, 220, 150), (190, 240, 170), (220, 255, 200)]),
+                                       3, grav=30))
+        if len(self.parts) < 120 and random.random() < 0.3:
+            self.parts.append(Particle(random.uniform(0, W), random.uniform(100, H),
+                                       random.uniform(-12, 12), random.uniform(-20, -6),
+                                       random.uniform(1.5, 3.0), (220, 255, 200), 2, grav=0, glow=True))
+
+    def _bg_sunset_keep(self, st, camx, fx, mx, t, L):
+        sunx = int(480 - camx * 0.1)
+        pygame.draw.circle(L, (255, 160, 90, 80), (sunx, 300), 90)
+        pygame.draw.circle(self.screen, (255, 200, 130), (sunx, 300), 52)
+        pygame.draw.circle(self.screen, (255, 225, 170), (sunx, 300), 40)
+        kx = 480 - camx * 0.3
+        pygame.draw.rect(self.screen, (70, 50, 80), (kx - 60, 220, 120, H - 220))
+        for tx0 in (kx - 150, kx + 150):
+            pygame.draw.rect(self.screen, (62, 44, 72), (tx0 - 40, 270, 80, H - 270))
+            pygame.draw.polygon(self.screen, (50, 36, 60),
+                                [(tx0 - 48, 270), (tx0 - 48, 240), (tx0 - 24, 240), (tx0 - 24, 270),
+                                 (tx0, 270), (tx0, 240), (tx0 + 24, 240), (tx0 + 24, 270),
+                                 (tx0 + 48, 270), (tx0 + 48, 240), (tx0 - 48, 240)])
+            pygame.draw.rect(self.screen, (48, 30, 50), (tx0 - 40, 240, 80, 8))
+            wave = math.sin(t * 3 + tx0) * 6
+            pygame.draw.polygon(self.screen, (200, 80, 90),
+                                [(tx0, 196), (tx0 + 44 + wave, 206), (tx0, 218)])
+            pygame.draw.line(self.screen, (40, 30, 40), (tx0, 180), (tx0, 200), 3)
+        pygame.draw.polygon(self.screen, (50, 36, 60),
+                            [(kx - 70, 220), (kx - 70, 190), (kx - 46, 190), (kx - 46, 220),
+                             (kx - 22, 220), (kx - 22, 190), (kx + 2, 190), (kx + 2, 220),
+                             (kx + 26, 220), (kx + 26, 190), (kx + 50, 190), (kx + 50, 220),
+                             (kx + 70, 220), (kx + 70, 190), (kx - 70, 190)])
+        for j in range(3):
+            wy = 260 + j * 50
+            on = int(t * 1.4 + j) % 2 == 0
+            pygame.draw.rect(self.screen, (255, 190, 120) if on else (60, 45, 65),
+                             (kx - 16, wy, 32, 20))
+            if on:
+                pygame.draw.circle(L, (255, 180, 110, 50), (int(kx), int(wy + 10)), 20)
+        for i in range(4):
+            clx = (i * 280 - t * 12 - camx * 0.2) % (W + 300) - 150
+            cy = 120 + i * 46
+            pygame.draw.ellipse(self.screen, (235, 150, 150), (clx - 80, cy, 160, 26))
+            pygame.draw.ellipse(self.screen, (250, 190, 190), (clx - 60, cy - 8, 120, 20))
+        pygame.draw.polygon(self.screen, (80, 55, 80), [(-40, H), (300, 400), (700, H)])
+        pygame.draw.polygon(self.screen, (70, 48, 72), [(500, H), (800, 420), (1100, H)])
+        for i in range(2):
+            bx = (t * 34 + i * 500) % (W + 100) - 50
+            by = 150 + i * 60 + math.sin(t * 2 + i) * 10
+            pygame.draw.arc(self.screen, (60, 40, 55), (int(bx - 10), int(by - 4), 20, 10), 3.4, 6.0, 2)
+
     def draw_bg(self, idx, camx=0):
         st = STAGES[idx]
         self.gradient(st["top"], st["bot"])
         t = self.t_global
         L = self.glow_layer
         fx, mx = -camx * 0.25, -camx * 0.5
+        _paint = {
+            "Ember Arena": self._bg_ember_arena,
+            "Sky Battlefield": self._bg_sky_battlefield,
+            "Void Final": self._bg_void_final,
+            "Fungal Hollow": self._bg_fungal_hollow,
+            "Storm Spire": self._bg_storm_spire,
+            "Tide Vault": self._bg_tide_vault,
+            "Iron Foundry": self._bg_iron_foundry,
+            "Thorn Garden": self._bg_thorn_garden,
+            "Glacier": self._bg_glacier,
+            "Dune Sea": self._bg_dune_sea,
+            "Hollow Star": self._bg_hollow_star,
+            "Clockwork": self._bg_clockwork,
+            "Magma Core": self._bg_magma_core,
+            "Cloud Nine": self._bg_cloud_nine,
+            "The Rift": self._bg_the_rift,
+            "Harbor Town": self._bg_harbor_town,
+            "World Tree": self._bg_world_tree,
+            "Sunset Keep": self._bg_sunset_keep,
+        }.get(st["name"])
+        if _paint is not None:
+            _paint(st, camx, fx, mx, t, L)
+            return
         if st["deco"] == "ember":
             # volcano silhouettes + glowing crater + lava floor glow
             pygame.draw.polygon(self.screen, (30, 8, 12), [(fx - 100, H), (fx + 140, 300), (fx + 380, H)])
@@ -3819,6 +4613,170 @@ class Game:
                                            random.uniform(1.5, 3.0), (190, 150, 255),
                                            3, grav=-30, glow=True))
 
+    # ================= PLATFORM SKINS (material look per arena) =================
+    def _slab(self, x, y, w, st, is_main, pi):
+        base, glow = st["plat"], st["glow"]
+        skin = st.get("skin", "")
+        thick = 22 if is_main else 14
+        dark_b = mix(base, (0, 0, 0), 0.55)
+        lite_b = mix(base, (255, 255, 255), 0.35)
+        side_b = mix(base, (0, 0, 0), 0.35)
+        pulse = 0.5 + 0.5 * math.sin(self.t_global * 3 + pi)
+        # drop shadow + extruded 3D side/end caps
+        pygame.draw.rect(self.screen, (10, 12, 20), (x - 6, y + 8, w + 12, thick + 12), border_radius=8)
+        dd = 15 if not is_main else 20
+        pygame.draw.polygon(self.screen, side_b,
+                            [(x + w, y + 2), (x + w + dd, y + 10), (x + w + dd, y + 10 + thick),
+                             (x + w, y + thick)])
+        pygame.draw.polygon(self.screen, mix(base, (0, 0, 0), 0.7),
+                            [(x, y + 2), (x - dd, y + 10), (x - dd, y + 10 + thick), (x, y + thick)])
+        pygame.draw.rect(self.screen, dark_b, (x, y + 6, w, thick - 4), border_radius=7)
+        pygame.draw.rect(self.screen, base, (x, y, w, 12 if not is_main else 14), border_radius=6)
+        pygame.draw.rect(self.screen, lite_b, (x, y, w, 4), border_radius=2)
+        pygame.draw.line(self.screen, (255, 255, 255), (x + 3, y + 1), (x + w - 3, y + 1), 1)
+        # --- material top pattern ---
+        if skin in ("obsidian", "magmarock"):
+            for ci in range(max(2, int(w // 130))):
+                cx2 = x + 30 + ci * (w - 60) / max(1, max(2, int(w // 130)) - 1)
+                if int(self.t_global * 3 + ci + pi) % 2 == 0:
+                    pygame.draw.line(self.screen, (255, 140, 60), (cx2, y + 4), (cx2 + 16, y + 4), 2)
+        elif skin in ("marble", "harbor", "keep", "spire", "sandstone"):
+            for sx in range(int(x + 40), int(x + w - 8), 44):
+                pygame.draw.line(self.screen, dark_b, (sx, y + 2), (sx, y + 11), 2)
+        elif skin in ("voidcrystal", "rift", "station"):
+            for sx in range(int(x + 26), int(x + w - 8), 52):
+                pygame.draw.line(self.screen, lite_b, (sx, y + 2), (sx + 12, y + 11), 2)
+            for sx in range(int(x + 40), int(x + w - 8), 78):
+                pygame.draw.circle(self.screen, glow, (sx, int(y + 6)), 2)
+        elif skin in ("shroom", "bark", "thorn"):
+            for sx in range(int(x + 22), int(x + w - 8), 40):
+                pygame.draw.circle(self.screen, mix(base, (200, 255, 190), 0.25), (sx, int(y + 7)), 3)
+            pygame.draw.line(self.screen, mix(base, (0, 0, 0), 0.4), (x + 4, y + 11), (x + w - 4, y + 11), 1)
+        elif skin == "abyss":
+            pygame.draw.line(self.screen, (220, 245, 255), (x + 8, y + 9), (x + w // 3, y + 3), 2)
+        elif skin in ("foundry", "brass"):
+            for rx in range(int(x + 14), int(x + w - 6), 34):
+                pygame.draw.circle(self.screen, dark_b, (rx, int(y + 9)), 2)
+            for ex in (x + 2, x + w - 14):
+                pygame.draw.rect(self.screen, (255, 200, 90), (ex, y + 2, 12, 8))
+                pygame.draw.line(self.screen, (30, 20, 15), (ex + 2, y + 2), (ex + 10, y + 10), 2)
+        elif skin == "frost":
+            pygame.draw.rect(self.screen, (250, 252, 255), (x, y, w, 3), border_radius=2)
+            pygame.draw.line(self.screen, (200, 230, 245), (x + 10, y + 10), (x + w // 2, y + 4), 2)
+        elif skin == "cloud":
+            for sx in range(int(x + 12), int(x + w - 4), 26):
+                pygame.draw.circle(self.screen, (255, 255, 255), (sx, int(y + 2)), 6)
+        # --- pulsing glow line + travelling spark ---
+        pygame.draw.line(self.screen, glow, (x, y + (18 if is_main else 15)),
+                         (x + w, y + (18 if is_main else 15)), 2)
+        pygame.draw.circle(self.glow_layer, (*glow, int(60 + 60 * pulse)),
+                           (int(x + w / 2), int(y + 15)), 5)
+        sx2 = x + ((self.t_global * 120 + pi * 170) % max(1, w))
+        pygame.draw.circle(self.screen, (255, 255, 255), (int(sx2), int(y + 15)), 2)
+        # --- corner caps (tech skins blink, others stay solid) ---
+        tech = skin in ("station", "brass", "foundry", "rift", "voidcrystal")
+        on = int(self.t_global * 2 + pi) % 2 == 0
+        c1 = (255, 220, 130) if (on or not tech) else (90, 70, 50)
+        c2 = (255, 220, 130) if ((not on) or not tech) else (90, 70, 50)
+        pygame.draw.circle(self.screen, c1, (int(x + 4), int(y + 4)), 2)
+        pygame.draw.circle(self.screen, c2, (int(x + w - 4), int(y + 4)), 2)
+        # --- hangers under floating platforms ---
+        if not is_main:
+            if skin in ("marble", "keep", "harbor", "spire", "brass", "foundry", "sandstone"):
+                for chx in (x + 18, x + w - 18):
+                    sway = math.sin(self.t_global * 2 + chx * 0.05) * 4
+                    pygame.draw.line(self.screen, (40, 42, 55), (chx, y + 22), (chx + sway, y + 52), 2)
+                    pygame.draw.circle(self.screen, (60, 62, 78), (int(chx + sway), int(y + 54)), 3)
+            elif skin in ("shroom", "bark", "thorn"):
+                for chx in (x + 18, x + w - 18):
+                    sway = math.sin(self.t_global * 1.6 + chx * 0.06) * 6
+                    pygame.draw.line(self.screen, (60, 120, 70), (chx, y + 20), (chx + sway, y + 50), 3)
+                    pygame.draw.circle(self.screen, (120, 200, 120), (int(chx + sway), int(y + 46)), 3)
+            elif skin in ("voidcrystal", "rift", "obsidian", "magmarock", "station", "abyss"):
+                cx0 = x + w / 2
+                bob = math.sin(self.t_global * 1.8 + x * 0.05) * 3
+                pygame.draw.polygon(self.screen, side_b,
+                                    [(cx0 - 9, y + 20), (cx0 + 9, y + 20), (cx0, y + 38 + bob)])
+                pygame.draw.line(self.screen, glow, (cx0 - 9, y + 20), (cx0, y + 38 + bob), 1)
+                pygame.draw.circle(self.glow_layer, (*glow, 60), (int(cx0), int(y + 30)), 10)
+            elif skin == "frost":
+                for ix in range(int(x + 20), int(x + w - 8), 34):
+                    pygame.draw.polygon(self.screen, (200, 230, 245),
+                                        [(ix, y + 20), (ix + 10, y + 20), (ix + 5, y + 34)])
+            elif skin == "cloud":
+                for px in (x + 24, x + w - 24):
+                    pygame.draw.circle(self.screen, (245, 248, 255), (int(px), int(y + 24)), 8)
+                    pygame.draw.circle(self.screen, (225, 232, 245), (int(px + 10), int(y + 28)), 6)
+
+    def _main_supports(self, m, st, shake_x, shake_y):
+        skin = st.get("skin", "")
+        mx0, my0, mw = m["x"] + shake_x, m["y"] + shake_y, m["w"]
+        if skin in ("voidcrystal", "rift", "station", "cloud"):
+            # floating island: crystal cluster + glow underneath, no pillars
+            for i, fxr in enumerate((0.3, 0.5, 0.7)):
+                cx0 = mx0 + mw * fxr
+                bob = math.sin(self.t_global * 1.5 + i * 2.1) * 4
+                pygame.draw.polygon(self.screen, mix(st["plat"], (0, 0, 0), 0.4),
+                                    [(cx0 - 12, my0 + 26), (cx0 + 12, my0 + 26), (cx0, my0 + 58 + bob)])
+                pygame.draw.circle(self.glow_layer, (*st["glow"], 50), (int(cx0), int(my0 + 40)), 14)
+        elif skin in ("shroom", "bark", "thorn"):
+            for fxr in (0.22, 0.5, 0.78):
+                cx0 = mx0 + mw * fxr
+                pygame.draw.polygon(self.screen, (60, 48, 36),
+                                    [(cx0 - 16, my0 + 28), (cx0 + 16, my0 + 28), (cx0 + 7, my0 + 100)])
+                pygame.draw.line(self.screen, (90, 140, 95), (cx0 - 10, my0 + 40), (cx0 - 4, my0 + 90), 2)
+        elif skin == "frost":
+            for fxr in (0.2, 0.5, 0.8):
+                cx0 = mx0 + mw * fxr
+                pygame.draw.polygon(self.screen, (170, 210, 235),
+                                    [(cx0 - 14, my0 + 28), (cx0 + 14, my0 + 28),
+                                     (cx0 + 8, my0 + 100), (cx0 - 8, my0 + 100)])
+                pygame.draw.line(self.screen, (240, 248, 255), (cx0 - 8, my0 + 34), (cx0 - 4, my0 + 94), 2)
+        else:
+            for fxr in (0.2, 0.5, 0.8):
+                cx0 = mx0 + mw * fxr
+                pygame.draw.rect(self.screen, (14, 15, 24), (cx0 - 9, my0 + 34, 18, 66))
+                pygame.draw.rect(self.screen, mix(st["plat"], (0, 0, 0), 0.4),
+                                 (cx0 - 9, my0 + 34, 18, 8))
+
+    def _main_dressing(self, m, st, shake_x, shake_y):
+        name = st["name"]
+        mxx, myy = m["x"] + shake_x, m["y"] + shake_y
+        if name in ("Ember Arena", "Magma Core"):
+            for ci in range(6):
+                cx2 = mxx + 60 + ci * (m["w"] - 120) / 5
+                if int(self.t_global * 3 + ci) % 2 == 0:
+                    pygame.draw.line(self.screen, (255, 140, 60), (cx2, myy + 4), (cx2 + 14, myy + 4), 2)
+        elif name == "Sky Battlefield":
+            for gi in range(7):
+                gx = mxx + 60 + gi * (m["w"] - 120) / 6
+                pygame.draw.circle(self.screen, (160, 220, 255), (int(gx), int(myy + 4)), 3)
+                pygame.draw.line(self.screen, (160, 220, 255), (gx - 8, myy + 4), (gx + 8, myy + 4), 1)
+        elif name in ("Void Final", "The Rift", "Hollow Star"):
+            rw = m["w"] * 0.3 * (0.9 + 0.1 * math.sin(self.t_global * 2))
+            pygame.draw.ellipse(self.screen, st["glow"], (mxx + m["w"] / 2 - rw / 2, myy - 8, rw, 14), 2)
+            pygame.draw.ellipse(self.glow_layer, (*st["glow"], 60),
+                                (mxx + m["w"] / 2 - rw / 2, myy - 8, rw, 14))
+        elif name in ("Fungal Hollow", "World Tree", "Thorn Garden"):
+            for gi in range(8):
+                gx = mxx + 40 + gi * (m["w"] - 80) / 7
+                if name == "Thorn Garden" and gi % 2 == 0:
+                    pygame.draw.polygon(self.screen, (70, 120, 70),
+                                        [(gx, myy), (gx + 5, myy - 12), (gx + 10, myy)])
+                else:
+                    pygame.draw.circle(self.screen, (140, 220, 150), (int(gx), int(myy - 4)), 3)
+                    pygame.draw.rect(self.screen, (80, 110, 85), (gx - 1, myy - 4, 2, 5))
+        elif name in ("Harbor Town", "Sunset Keep", "Storm Spire", "Clockwork", "Iron Foundry"):
+            for sx in range(int(mxx + 30), int(mxx + m["w"] - 10), 60):
+                pygame.draw.line(self.screen, mix(st["plat"], (0, 0, 0), 0.45), (sx, myy + 2), (sx, myy + 12), 2)
+        elif name == "Glacier":
+            pygame.draw.rect(self.screen, (250, 252, 255), (mxx + 2, myy, m["w"] - 4, 3), border_radius=2)
+        elif name == "Tide Vault":
+            pygame.draw.ellipse(self.screen, (200, 240, 255), (mxx + m["w"] / 2 - 90, myy + 1, 180, 7))
+        elif name == "Cloud Nine":
+            for sx in range(int(mxx + 16), int(mxx + m["w"] - 4), 44):
+                pygame.draw.circle(self.screen, (255, 255, 255), (sx, int(myy + 1)), 7)
+
     def draw_stage(self, idx, shake_x=0, shake_y=0):
         st = STAGES[idx]
         glow = st["glow"]
@@ -3828,63 +4786,12 @@ class Game:
         pygame.draw.ellipse(self.glow_layer, (*glow, int(40 + 30 * pulse)),
                             (m["x"] - 30 + shake_x, m["y"] + 22 + shake_y, m["w"] + 60, 30))
         for pi, pl in enumerate([st["main"]] + st["plats"]):
-            x, y, w = pl["x"] + shake_x, pl["y"] + shake_y, pl["w"]
-            base = st["plat"]
-            dark_b = mix(base, (0, 0, 0), 0.55)
-            lite_b = mix(base, (255, 255, 255), 0.35)
-            side_b = mix(base, (0, 0, 0), 0.35)
-            # 3D slab: drop shadow, extruded side/end caps, front face, top face
-            pygame.draw.rect(self.screen, (10, 12, 20), (x - 6, y + 8, w + 12, 28), border_radius=8)
-            pygame.draw.polygon(self.screen, side_b,
-                                [(x + w, y + 2), (x + w + 15, y + 12), (x + w + 15, y + 30), (x + w, y + 22)])
-            pygame.draw.polygon(self.screen, mix(base, (0, 0, 0), 0.7),
-                                [(x, y + 2), (x - 15, y + 12), (x - 15, y + 30), (x, y + 22)])
-            pygame.draw.rect(self.screen, dark_b, (x, y + 6, w, 16), border_radius=7)
-            pygame.draw.rect(self.screen, base, (x, y, w, 14), border_radius=7)
-            pygame.draw.rect(self.screen, lite_b, (x, y, w, 5), border_radius=3)
-            pygame.draw.line(self.screen, (255, 255, 255), (x + 3, y + 1), (x + w - 3, y + 1), 1)
-            # rivets
-            for rx in range(int(x + 14), int(x + w - 6), 34):
-                pygame.draw.circle(self.screen, dark_b, (rx, int(y + 10)), 2)
-            # pulsing glow line + travelling spark
-            pygame.draw.line(self.screen, glow, (x, y + 16), (x + w, y + 16), 2)
-            pygame.draw.circle(self.glow_layer, (*glow, int(60 + 60 * pulse)), (int(x + w / 2), int(y + 16)), 5)
-            sx2 = x + ((self.t_global * 120 + pi * 170) % max(1, w))
-            pygame.draw.circle(self.screen, (255, 255, 255), (int(sx2), int(y + 16)), 2)
-            # blinking edge lights
-            on = int(self.t_global * 2 + pi) % 2 == 0
-            pygame.draw.circle(self.screen, (255, 220, 130) if on else (90, 70, 50),
-                               (int(x + 4), int(y + 4)), 2)
-            pygame.draw.circle(self.screen, (255, 220, 130) if not on else (90, 70, 50),
-                               (int(x + w - 4), int(y + 4)), 2)
-            if pl is not m:
-                for chx in (x + 18, x + w - 18):
-                    sway = math.sin(self.t_global * 2 + chx * 0.05) * 4
-                    pygame.draw.line(self.screen, (40, 42, 55), (chx, y + 22), (chx + sway, y + 52), 2)
-                    pygame.draw.circle(self.screen, (60, 62, 78), (int(chx + sway), int(y + 54)), 3)
-        # support pillars under the main platform
-        for pxi in (0.2, 0.5, 0.8):
-            px = m["x"] + shake_x + m["w"] * pxi
-            pygame.draw.rect(self.screen, (14, 15, 24), (px - 9, m["y"] + 34 + shake_y, 18, 66))
-            pygame.draw.rect(self.screen, mix(st["plat"], (0, 0, 0), 0.4),
-                             (px - 9, m["y"] + 34 + shake_y, 18, 8))
-        # theme dressing on the main platform
-        mxx, myy = m["x"] + shake_x, m["y"] + shake_y
-        if st["deco"] == "void":
-            rw = m["w"] * 0.3 * (0.9 + 0.1 * math.sin(self.t_global * 2))
-            pygame.draw.ellipse(self.screen, st["glow"], (mxx + m["w"] / 2 - rw / 2, myy - 8, rw, 14), 2)
-            pygame.draw.ellipse(self.glow_layer, (*st["glow"], 60),
-                                (mxx + m["w"] / 2 - rw / 2, myy - 8, rw, 14))
-        elif st["deco"] == "sky":
-            for gi in range(10):
-                gx = mxx + 20 + gi * (m["w"] - 40) / 9
-                pygame.draw.polygon(self.screen, (90, 180, 110),
-                                    [(gx, myy), (gx + 4, myy - 9), (gx + 8, myy)])
-        elif st["deco"] == "ember":
-            for ci in range(6):
-                cx2 = mxx + 60 + ci * (m["w"] - 120) / 5
-                if int(self.t_global * 3 + ci) % 2 == 0:
-                    pygame.draw.line(self.screen, (255, 140, 60), (cx2, myy + 3), (cx2 + 14, myy + 3), 2)
+            self._slab(pl["x"] + shake_x, pl["y"] + shake_y, pl["w"], st,
+                       pl is m, pi)
+        # supports under the main platform (per material: pillars / roots / crystals)
+        self._main_supports(m, st, shake_x, shake_y)
+        # theme dressing on the main platform (per arena)
+        self._main_dressing(m, st, shake_x, shake_y)
         # bounce pads
         for pd in st.get("pads", []):
             px, py, pw = pd["x"] + shake_x, pd["y"] + shake_y, pd["w"]
@@ -3903,15 +4810,27 @@ class Game:
                 pygame.draw.line(self.screen, st["glow"], (px, py + 15), (px + pw, py + 15), 2)
             else:
                 pygame.draw.rect(self.screen, st["glow"], (px, py, pw, 14), 1, border_radius=6)
-        # spike strips
+        # spike strips (themed per arena: thorns / ice shards / hot metal)
         for sp in st.get("spikes", []):
             sx, sy, sw = sp["x"] + shake_x, sp["y"] + shake_y, sp["w"]
+            skin = st.get("skin", "")
+            if skin == "thorn":
+                scol, tip = (90, 160, 90), (200, 230, 170)
+            elif skin == "frost":
+                scol, tip = (150, 200, 235), (240, 250, 255)
+            elif skin in ("foundry", "magmarock", "obsidian"):
+                scol, tip = (200, 90, 50), (255, 190, 110)
+            else:
+                scol, tip = (200, 60, 60), (255, 150, 150)
             n = max(2, int(sw // 18))
             for ti in range(n):
                 tx0 = sx + ti * sw / n
-                pygame.draw.polygon(self.screen, (200, 60, 60),
+                pygame.draw.polygon(self.screen, scol,
                                     [(tx0, sy), (tx0 + sw / n / 2, sy - 15), (tx0 + sw / n, sy)])
-            pygame.draw.circle(self.glow_layer, (255, 80, 80, 60), (int(sx + sw / 2), int(sy - 8)), 14)
+                pygame.draw.line(self.screen, tip, (tx0 + sw / n / 2, sy - 15),
+                                 (tx0 + sw / n / 2, sy - 4), 1)
+            pygame.draw.circle(self.glow_layer, (scol[0], scol[1], scol[2], 60),
+                               (int(sx + sw / 2), int(sy - 8)), 14)
         # lava pools (animated surface + bubbles + glow)
         for lv in st.get("lava", []):
             lx, ly, lw = lv["x"] + shake_x, lv["y"] + shake_y, lv["w"]
@@ -3926,23 +4845,32 @@ class Game:
                 self.parts.append(Particle(lx + random.uniform(0, lw) + self.cam, ly - 6,
                                            random.uniform(-20, 20), random.uniform(-120, -40),
                                            0.5, (255, 150, 60), 4, grav=-200, glow=True))
-        # breakable platforms (cracks grow as hp drops)
+        # breakable platforms (cracks grow as hp drops, ghost outline while regenerating)
         for b in getattr(self, "brk", []):
-            if b["hp"] <= 0:
-                continue
             bx, by, bw = b["x"] + shake_x, b["y"] + shake_y, b["w"]
+            if b["hp"] <= 0:
+                pygame.draw.rect(self.screen, st["glow"], (bx, by, bw, 14), 1, border_radius=6)
+                if b.get("regen", 0) > 0:
+                    frac = 1.0 - b["regen"] / 12.0
+                    pygame.draw.rect(self.screen, st["glow"],
+                                     (bx, by + 16, bw * max(0.0, min(1.0, frac)), 3), border_radius=2)
+                continue
             maxhp = next((d["hp"] for d in st.get("breakables", [])
                           if d["x"] == b["x"] and d["y"] == b["y"]), 3)
             frac = b["hp"] / max(1, maxhp)
             base = mix(st["plat"], (60, 30, 20), 0.35 * (1 - frac))
             pygame.draw.rect(self.screen, (10, 12, 20), (bx - 4, by + 8, bw + 8, 24), border_radius=7)
-            pygame.draw.rect(self.screen, base, (bx, by, bw, 18), border_radius=6)
+            pygame.draw.rect(self.screen, mix(base, (0, 0, 0), 0.35), (bx, by + 6, bw, 14), border_radius=6)
+            pygame.draw.rect(self.screen, base, (bx, by, bw, 13), border_radius=6)
             pygame.draw.rect(self.screen, (255, 220, 160), (bx, by, bw, 4), border_radius=2)
+            pygame.draw.line(self.screen, st["glow"], (bx, by + 15), (bx + bw, by + 15), 2)
             if frac < 1.0:
                 nck = int((1 - frac) * 4) + 1
                 for ci in range(nck):
                     cxp = bx + (ci + 1) * bw / (nck + 1)
-                    pygame.draw.line(self.screen, (20, 10, 8), (cxp, by + 2), (cxp + 6, by + 14), 2)
+                    pygame.draw.line(self.screen, (20, 10, 8), (cxp, by + 2), (cxp + 6, by + 13), 2)
+                pygame.draw.circle(self.glow_layer, (255, 120, 80, 50),
+                                   (int(bx + bw / 2), int(by + 8)), 12)
 
     def draw_projs(self, shx=0, shy=0):
         for pr in self.projs:
@@ -4495,12 +5423,33 @@ class Game:
                 if STAGES[i].get("lava"):
                     tags.append("LAVA")
                 self.text(" · ".join(tags) if tags else "CLASSIC", x + 10, y + 22, 10, UI_GOLD, mono=True)
+                # mini diorama: sky gradient, layout plats, hazards, glow accent
+                dx0, dy0, dw2, dh2 = x + 8, y + 38, tw2 - 16, th2 - 46
+                pygame.draw.rect(self.screen, STAGES[i]["top"], (dx0, dy0, dw2, dh2), border_radius=5)
+                pygame.draw.rect(self.screen, STAGES[i]["bot"], (dx0, dy0 + dh2 // 2, dw2, dh2 - dh2 // 2),
+                                 border_bottom_left_radius=5, border_bottom_right_radius=5)
                 k = (tw2 - 24) / float(STAGES[i].get("w", 960))
                 oy = y + th2 - 8
-                for pl in [STAGES[i]["main"]] + STAGES[i]["plats"] + STAGES[i].get("pads", []):
+                for pl in [STAGES[i]["main"]] + STAGES[i]["plats"]:
                     px, pw2 = x + 12 + pl["x"] * k, max(5, pl["w"] * k)
                     py = oy - (430 - pl["y"]) * 0.06
                     pygame.draw.rect(self.screen, STAGES[i]["plat"], (px, py, pw2, 3), border_radius=2)
+                    pygame.draw.line(self.screen, STAGES[i]["glow"], (px, py + 3, px + pw2, py + 3), 1)
+                for b in STAGES[i].get("breakables", []):
+                    px, pw2 = x + 12 + b["x"] * k, max(5, b["w"] * k)
+                    py = oy - (430 - b["y"]) * 0.06
+                    pygame.draw.rect(self.screen, STAGES[i]["glow"], (px, py - 3, pw2, 3), 1,
+                                     border_radius=1)
+                for ph in STAGES[i].get("phases", []):
+                    px, pw2 = x + 12 + ph["x"] * k, max(5, ph["w"] * k)
+                    py = oy - (430 - ph["y"]) * 0.06
+                    pygame.draw.rect(self.screen, (255, 255, 255), (px, py, pw2, 2), border_radius=1)
+                for pd in STAGES[i].get("pads", []):
+                    px, pw2 = x + 12 + pd["x"] * k, max(4, pd["w"] * k)
+                    pygame.draw.line(self.screen, (150, 255, 170), (px, oy - 4), (px + pw2, oy - 4), 2)
+                for sp in STAGES[i].get("spikes", []):
+                    pygame.draw.line(self.screen, (255, 90, 90),
+                                     (x + 12 + sp["x"] * k, oy), (x + 12 + (sp["x"] + sp["w"]) * k, oy), 2)
                 for lv in STAGES[i].get("lava", []):
                     pygame.draw.line(self.screen, (255, 140, 60),
                                      (x + 12 + lv["x"] * k, oy), (x + 12 + (lv["x"] + lv["w"]) * k, oy), 2)
@@ -4609,24 +5558,43 @@ class Game:
         dim = pygame.Surface((W, H), pygame.SRCALPHA)
         dim.fill((5, 6, 14, 170))
         self.screen.blit(dim, (0, 0))
-        self.ctext("ONLINE VERSUS", W // 2, 90, 44, UI_GOLD)
-        self.ctext("same WiFi · host shares IP · port 7001", W // 2, 145, 14, UI_DIM)
-        labels = [("HOST GAME", "host", "You run the match"),
-                  ("JOIN GAME", "join", "Enter the host IP")]
+        self.ctext("ONLINE VERSUS", W // 2, 70, 44, UI_GOLD)
+        self.ctext("LAN: same WiFi · host shares IP · port 7001", W // 2, 125, 14, UI_DIM)
+        labels = [("HOST GAME", "host", "LAN: you run the match"),
+                  ("JOIN GAME", "join", "LAN: enter the host IP"),
+                  ("INTERNET ROOM", "room", "Online: room code, no setup")]
         self.online_buttons = [Button(lb, a, sub=s, w=280) for lb, a, s in labels]
         mpos = pygame.mouse.get_pos()
         for i, b in enumerate(self.online_buttons):
+            b.draw(self.screen, self, W // 2 - 140, 180 + i * 62,
+                   self.menu_idx == i, b.rect.collidepoint(mpos))
+        self.ctext("ESC back", W // 2, 390, 13, UI_DIM)
+
+    def draw_net(self):
+        self.draw_bg(2)
+        dim = pygame.Surface((W, H), pygame.SRCALPHA)
+        dim.fill((5, 6, 14, 170))
+        self.screen.blit(dim, (0, 0))
+        self.ctext("INTERNET ROOM", W // 2, 90, 44, UI_GOLD)
+        self.ctext("no port forwarding needed — just share the code", W // 2, 145, 14, UI_DIM)
+        labels = [("HOST ROOM", "rhost", "Get a code, wait for friend"),
+                  ("JOIN ROOM", "rjoin", "Enter a friend's code")]
+        self.net_buttons = [Button(lb, a, sub=s, w=280) for lb, a, s in labels]
+        mpos = pygame.mouse.get_pos()
+        for i, b in enumerate(self.net_buttons):
             b.draw(self.screen, self, W // 2 - 140, 210 + i * 62,
                    self.menu_idx == i, b.rect.collidepoint(mpos))
         self.ctext("ESC back", W // 2, 360, 13, UI_DIM)
 
     def draw_ip(self):
+        room = getattr(self, "ip_mode", "ip") == "room"
         self.draw_bg(2)
         dim = pygame.Surface((W, H), pygame.SRCALPHA)
         dim.fill((5, 6, 14, 170))
         self.screen.blit(dim, (0, 0))
-        self.ctext("JOIN GAME", W // 2, 120, 40, UI_GOLD)
-        self.ctext("Type the host IP shown on their lobby screen", W // 2, 175, 14, UI_DIM)
+        self.ctext("JOIN ROOM" if room else "JOIN GAME", W // 2, 120, 40, UI_GOLD)
+        self.ctext("Type the room code your friend is showing" if room else
+                   "Type the host IP shown on their lobby screen", W // 2, 175, 14, UI_DIM)
         self.panel(W // 2 - 220, 220, 440, 64, accent=UI_CYAN)
         cur = self.ip_buf + ("_" if int(self.t_global * 2) % 2 == 0 else "")
         self.ctext(cur or " ", W // 2, 232, 30, UI_TEXT, mono=True)
@@ -4653,7 +5621,10 @@ class Game:
             self.text("GUEST · waiting…", W // 2 - 145, 210, 17, UI_DIM)
             self.text("they pick a fighter on join", W // 2 - 145, 234, 13, UI_DIM)
         self.panel(W // 2 - 230, 276, 460, 56, accent=UI_GOLD)
-        self.ctext(f"HOST IP  {self.net_local_ip} : 7001", W // 2, 286, 20, UI_TEXT, mono=True)
+        if getattr(self, "net_link", None) == "relay":
+            self.ctext(f"ROOM CODE  {self.net_room}", W // 2, 286, 24, UI_TEXT, mono=True)
+        else:
+            self.ctext(f"HOST IP  {self.net_local_ip} : 7001", W // 2, 286, 20, UI_TEXT, mono=True)
         self.ctext("same WiFi (or ZeroTier / Hamachi for internet)", W // 2, 310, 12, UI_DIM)
         if self.net_guest_cid:
             if int(self.t_global * 2) % 2 == 0:
@@ -4709,6 +5680,8 @@ class Game:
             self.draw_help()
         elif self.state == "online":
             self.draw_online()
+        elif self.state == "net":
+            self.draw_net()
         elif self.state == "ip":
             self.draw_ip()
         elif self.state == "lobby":
@@ -4888,28 +5861,57 @@ def main():
                         g.state = "title"
                 elif g.state == "online":
                     if k in (pygame.K_UP, pygame.K_w):
-                        g.menu_idx = (g.menu_idx - 1) % 2
+                        g.menu_idx = (g.menu_idx - 1) % 3
                     elif k in (pygame.K_DOWN, pygame.K_s):
-                        g.menu_idx = (g.menu_idx + 1) % 2
+                        g.menu_idx = (g.menu_idx + 1) % 3
                     elif k in (pygame.K_RETURN, pygame.K_SPACE):
                         if g.menu_idx == 0:
                             if g.net_start_host():
                                 g.goto_select()
                             else:
                                 g.state = "title"
-                        else:
+                        elif g.menu_idx == 1:
                             g.state = "ip"
                             g.ip_buf = ""
                             g.ip_err = ""
+                            g.ip_mode = "ip"
+                            g.menu_idx = 0
+                        else:
+                            g.state = "net"
                             g.menu_idx = 0
                     elif k == pygame.K_ESCAPE:
                         g.state = "title"
                         g.menu_idx = 2
+                elif g.state == "net":
+                    if k in (pygame.K_UP, pygame.K_w):
+                        g.menu_idx = (g.menu_idx - 1) % 2
+                    elif k in (pygame.K_DOWN, pygame.K_s):
+                        g.menu_idx = (g.menu_idx + 1) % 2
+                    elif k in (pygame.K_RETURN, pygame.K_SPACE):
+                        if g.menu_idx == 0:
+                            if g.net_start_host(link="relay"):
+                                g.goto_select()
+                            else:
+                                g.state = "online"
+                        else:
+                            g.state = "ip"
+                            g.ip_buf = ""
+                            g.ip_err = ""
+                            g.ip_mode = "room"
+                            g.menu_idx = 0
+                    elif k == pygame.K_ESCAPE:
+                        g.state = "online"
                 elif g.state == "ip":
                     if k == pygame.K_ESCAPE:
                         g.state = "online"
                     elif k == pygame.K_RETURN:
-                        if g.net_connect(g.ip_buf):
+                        if getattr(g, "ip_mode", "ip") == "room":
+                            if g.net_relay_join(g.ip_buf):
+                                g.state = "gpick"
+                                g.gpick_idx = 0
+                            elif not g.ip_err:
+                                g.ip_err = "could not join room"
+                        elif g.net_connect(g.ip_buf):
                             g.state = "gpick"
                             g.gpick_idx = 0
                         elif not g.ip_err:
@@ -4917,8 +5919,10 @@ def main():
                     elif k == pygame.K_BACKSPACE:
                         g.ip_buf = g.ip_buf[:-1]
                         g.ip_err = ""
-                    elif ev.unicode and (ev.unicode.isdigit() or ev.unicode == ".") and len(g.ip_buf) < 15:
-                        g.ip_buf += ev.unicode
+                    elif ev.unicode and len(g.ip_buf) < 15 and (
+                            ev.unicode.isdigit() or ev.unicode == "." or
+                            (getattr(g, "ip_mode", "ip") == "room" and ev.unicode.isalnum())):
+                        g.ip_buf += ev.unicode.upper() if getattr(g, "ip_mode", "ip") == "room" else ev.unicode
                         g.ip_err = ""
                 elif g.state == "select":
                     s = g.sel
@@ -5075,10 +6079,28 @@ def main():
                             if i == 0:
                                 if g.net_start_host():
                                     g.goto_select()
+                            elif i == 1:
+                                g.state = "ip"
+                                g.ip_buf = ""
+                                g.ip_err = ""
+                                g.ip_mode = "ip"
+                            else:
+                                g.state = "net"
+                                g.menu_idx = 0
+                            break
+                elif g.state == "net":
+                    for i, b in enumerate(g.net_buttons):
+                        if b.rect.collidepoint(pos):
+                            g.menu_idx = i
+                            if i == 0:
+                                if g.net_start_host(link="relay"):
+                                    g.goto_select()
                             else:
                                 g.state = "ip"
                                 g.ip_buf = ""
                                 g.ip_err = ""
+                                g.ip_mode = "room"
+                            break
                 elif g.state == "help":
                     if getattr(g, "help_back", None) and g.help_back.rect.collidepoint(pos):
                         g.state = "title"
