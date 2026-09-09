@@ -45,8 +45,12 @@ behind on stocks. Record kept per-fighter in `pc_build/save.json`.
   void crystal, shroom wood, spire stone, abyss glass, riveted iron, briar, frost,
   sandstone, station hull, brass, magmarock, cloud, rift crystal, harbor stone, bark,
   keep stone) with matching supports (pillars, roots, floating crystals, chains, icicles).
-  Collision platforms are aligned to the key art layouts. Camera follows the PLAYER (72% P1 +
-  28% foe + velocity lookahead) with parallax;
+  Presentation follows Smash readability rules: atmospheric haze pushes backgrounds back,
+  every platform has a bright distinct top surface with a crisp light edge, dark rim and
+  slim glow trim, floating platforms hang a Battlefield-style under-frame with a glowing
+  pendant, and shadows are soft and tight (no black bars).
+  Collision platforms are aligned to the key art layouts. Camera is glued to the PLAYER
+  (position + velocity lookahead, foe-independent) with parallax;
   pillars, chains, runes, grass, lava cracks, pads, phases, spikes all drawn per theme.
   Blast zones scale with world width.
 - **Stage paintings:** drop AI-generated backgrounds in `pc_build/assets/stages/` using the exact
