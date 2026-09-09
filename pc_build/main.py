@@ -1270,6 +1270,30 @@ class Game:
         self.pad_refresh()
         self.sprites = self.load_sprites()
         self.stage_art = self.load_stage_art()
+        # --- hardware 3D stage renderer (optional; software fallback otherwise) ---
+        self.gl3d = None
+        self._gl3d_mod = None
+        if "--no-gl" not in sys.argv:
+            try:
+                import gl3d as _gl3d
+                if _gl3d.AVAILABLE:
+                    self.gl3d = _gl3d.Renderer()
+                    self._gl3d_mod = _gl3d
+                    for name, art in self.stage_art.items():
+                        bg = art.get("bg")
+                        if bg is None:
+                            continue
+                        raw = pygame.image.tostring(bg, "RGB")
+                        mid = art.get("mid")
+                        if mid is not None:
+                            mraw = pygame.image.tostring(mid.convert_alpha(), "RGBA")
+                            self.gl3d.set_painting(name, raw, bg.get_width(), bg.get_height(),
+                                                   mraw, mid.get_width(), mid.get_height())
+                        else:
+                            self.gl3d.set_painting(name, raw, bg.get_width(), bg.get_height())
+            except Exception:
+                self.gl3d = None
+                self._gl3d_mod = None
         # --- online play (host-authoritative; see netplay.py) ---
         self.net_role = None
         self.net_peer = None
@@ -1872,8 +1896,8 @@ class Game:
             for f in self.fighters:
                 if not f.alive() or f.state == "respawn":
                     continue
-                if f is pr.owner and not (pr.kind == "disc" and pr.ret):
-                    continue
+                if f is pr.owner:
+                    continue  # your own projectiles never hit you (returning chakram included)
                 if id(f) in pr.last_hit and pr.t - pr.last_hit[id(f)] < 0.5:
                     continue
                 if r.colliderect(f.rect()):
@@ -4827,6 +4851,30 @@ class Game:
             for sx in range(int(mxx + 16), int(mxx + m["w"] - 4), 44):
                 pygame.draw.circle(self.screen, (255, 255, 255), (sx, int(myy + 1)), 7)
 
+    def _gl_dyn(self):
+        """Live platform boxes for the GL renderer: breakables + phases."""
+        st = STAGES[self.stage_idx]
+        top, side, _, _ = self._gl3d_mod._skin_colors(st)
+        out = []
+        for b in getattr(self, "brk", []):
+            if b["hp"] <= 0:
+                continue
+            maxhp = next((d["hp"] for d in st.get("breakables", [])
+                          if d["x"] == b["x"] and d["y"] == b["y"]), 3)
+            frac = b["hp"] / max(1, maxhp)
+            out.append({"x": b["x"], "y": b["y"], "w": b["w"], "thick": 15,
+                        "top": top, "side": side, "emit": 0.9 * (1 - frac), "rock": True})
+        for ph in st.get("phases", []):
+            if self.phase_on(ph):
+                out.append({"x": ph["x"], "y": ph["y"], "w": ph["w"], "thick": 15,
+                            "top": top, "side": side, "emit": 0.0, "rock": True})
+            else:
+                ghost = mix(top, (20, 20, 30), 0.55)
+                pulse = 0.35 + 0.25 * math.sin(self.t_global * 6.0 + ph.get("off", 0))
+                out.append({"x": ph["x"], "y": ph["y"], "w": ph["w"], "thick": 15,
+                            "top": ghost, "side": ghost, "emit": pulse, "rock": False})
+        return out
+
     def draw_stage(self, idx, shake_x=0, shake_y=0):
         st = STAGES[idx]
         glow = st["glow"]
@@ -5746,9 +5794,23 @@ class Game:
             self.draw_gameover()
         elif self.state == "fight":
             wx = shx - self.cam
-            self.draw_bg(self.stage_idx, self.cam)
-            self.draw_stage_art(self.stage_idx)
-            self.draw_stage(self.stage_idx, wx, shy)
+            gl_ok = False
+            if self.gl3d is not None:
+                try:
+                    extra = []
+                    if STAGES[self.stage_idx]["name"] == "Clockwork":
+                        extra = self._gl3d_mod.dyn_clock_hands(self.t_global)
+                    raw = self.gl3d.render(STAGES[self.stage_idx], self.cam + W / 2,
+                                           self.t_global, dyn=self._gl_dyn(),
+                                           shx=shx, shy=shy, dyn_extra=extra)
+                    self.screen.blit(pygame.image.fromstring(raw, (W, H), "RGB"), (0, 0))
+                    gl_ok = True
+                except Exception:
+                    self.gl3d = None
+            if not gl_ok:
+                self.draw_bg(self.stage_idx, self.cam)
+                self.draw_stage_art(self.stage_idx)
+                self.draw_stage(self.stage_idx, wx, shy)
             self.draw_projs(wx, shy)
             self.draw_drops(wx, shy)
             self.draw_echoes(wx, shy)
