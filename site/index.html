@@ -84,6 +84,10 @@
   kbd { background: #26263a; border: 1px solid #3d3d5c; border-bottom-width: 3px; border-radius: 6px;
         padding: 1px 8px; font-family: Consolas, monospace; font-size: 14px; }
   ol li, ul li { margin: 9px 0; line-height: 1.55; }
+  .faq details { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+                 margin: 10px 0; padding: 13px 16px; }
+  .faq summary { cursor: pointer; font-weight: 700; color: var(--gold); }
+  .faq p { margin: 10px 0 2px; color: #c6c6dc; line-height: 1.55; }
   a { color: var(--gold); }
   footer { margin-top: 60px; color: #6d6d88; font-size: 13px; text-align: center; }
 </style>
@@ -152,6 +156,37 @@
   </section>
 
   <section class="reveal">
+    <h2>How a match works</h2>
+    <div class="grid">
+      <div class="card"><b>Damage %</b><br>Hits raise your percent — the higher it climbs, the farther you fly. There is no health bar.</div>
+      <div class="card"><b>Stocks &amp; blast zones</b><br>Fly past the edge and you lose a stock. 4 stocks each, 3 minutes. Tied at timeout? Sudden death — both at 300%.</div>
+      <div class="card"><b>Drops &amp; ultimates</b><br>Items rain onto the stage: weapons, shields, chaos pickups. Fighting charges your ultimate bar — every fighter has a screen-clearing finisher.</div>
+      <div class="card"><b>Win streaks</b><br>Keep winning and your fighter hits slightly harder, up to +20%. Lose and the bonus resets.</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <h2>Modes</h2>
+    <div class="grid">
+      <div class="card"><b>Solo vs CPU</b><br>Four difficulties from punching-bag Rookie up to Nightmare, which reads your habits. Learn a new fighter here first.</div>
+      <div class="card"><b>Internet rooms</b><br>Host gets a 5-letter code, friend joins from anywhere. Host simulates, guest mirrors — smooth on normal broadband.</div>
+      <div class="card"><b>Classroom LAN</b><br>Same WiFi, lowest latency. One PC hosts on port 7001, the other joins its IP. No internet needed at all.</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <h2>More arenas</h2>
+    <div class="gallery">
+      <figure><img src="images/harbor_town.png" alt="Harbor Town" loading="lazy"><figcaption><b>Harbor Town</b> — plaza brawl by the water.</figcaption></figure>
+      <figure><img src="images/world_tree.png" alt="World Tree" loading="lazy"><figcaption><b>World Tree</b> — great tree island, gaps everywhere.</figcaption></figure>
+      <figure><img src="images/hollow_star.png" alt="Hollow Star" loading="lazy"><figcaption><b>Hollow Star</b> — orbital station, tight platforms.</figcaption></figure>
+      <figure><img src="images/glacier.png" alt="Glacier" loading="lazy"><figcaption><b>Glacier</b> — slippery summit under the aurora.</figcaption></figure>
+      <figure><img src="images/iron_foundry.png" alt="Iron Foundry" loading="lazy"><figcaption><b>Iron Foundry</b> — skull fortress, heavy metal.</figcaption></figure>
+    </div>
+    <p style="color:#8f8fa8">…plus 9 more, 18 in total: lava, spikes, wind, ice, breakable floors, moving platforms, shifting gravity.</p>
+  </section>
+
+  <section class="reveal">
     <h2>Controls (P1)</h2>
     <div class="grid">
       <div class="card"><b>Move / jump</b><br><kbd>A</kbd><kbd>D</kbd> or arrows &middot; <kbd>Space</kbd>/<kbd>W</kbd> ×2 double-jump &middot; <kbd>Shift</kbd> dash</div>
@@ -159,6 +194,23 @@
       <div class="card"><b>Super &amp; ultimate</b><br><kbd>S</kbd>/<kbd>E</kbd> super &middot; <kbd>F</kbd> ultimate when the bar is full</div>
       <div class="card"><b>Defense &amp; extras</b><br><kbd>L</kbd> shield &middot; right-click SMART move &middot; <kbd>TAB</kbd> move list &middot; <kbd>F11</kbd> fullscreen &middot; 8BitDo SN30 supported</div>
     </div>
+  </section>
+
+  <section class="reveal">
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details><summary>Is it really free?</summary><p>Yes. No ads, no accounts, no microtransactions. One exe, full game.</p></details>
+      <details><summary>Windows only? What about Mac / phones?</summary><p>Right now: Windows 10/11 PCs only. It needs a keyboard (or an 8BitDo-style gamepad) and ~100MB of disk.</p></details>
+      <details><summary>Windows says it "protected my PC". Is it a virus?</summary><p>No — SmartScreen warns about any new unsigned program. Click <b>More info → Run anyway</b>. If you want, scan it with Windows Security first; it passes clean.</p></details>
+      <details><summary>Online lags at my school. Fix?</summary><p>Try an internet room first. If the school firewall eats it, use classroom LAN (host port 7001), or put both PCs on a phone hotspot — that almost always works.</p></details>
+      <details><summary>Can I use a controller?</summary><p>Yes — 8BitDo SN30 in XInput mode (boot with Start+X) plus most XInput pads. The game shows live pad status on the title screen.</p></details>
+      <details><summary>Where are my wins saved?</summary><p>On your own PC at <b>%USERPROFILE%\.riftbreak\save.json</b> — per-fighter records and your win streak live there, even offline.</p></details>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <h2>Changelog</h2>
+    <div class="card"><b>v1.0 — first playable</b><br>10 fighters &middot; 18 arenas &middot; internet rooms + LAN &middot; ultimates, drops, streaks &middot; player-locked camera &middot; gamepad support</div>
   </section>
 
   <footer>
