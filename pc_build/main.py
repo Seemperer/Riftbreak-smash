@@ -4475,11 +4475,11 @@ class Game:
             ov = pygame.Surface((W, H), pygame.SRCALPHA)
             for y in range(120, H, 6):
                 if y < 300:
-                    a = int(46 * (y - 120) / 180)
+                    a = int(24 * (y - 120) / 180)
                 elif y < 430:
-                    a = 46
+                    a = 24
                 else:
-                    a = int(46 - 22 * (y - 430) / max(1, H - 430))
+                    a = int(24 - 12 * (y - 430) / max(1, H - 430))
                 if a > 0:
                     pygame.draw.rect(ov, (*tint, a), (0, y, W, 6))
             cache[idx] = ov
@@ -4647,98 +4647,115 @@ class Game:
 
     # ================= PLATFORM SKINS (material look per arena) =================
     def _slab(self, x, y, w, st, is_main, pi):
+        # Smash-style slab: soft shadow, gradient body, bright distinct top
+        # surface, slim glow trim, Battlefield-style under-frame + pendant.
         base, glow = st["plat"], st["glow"]
         skin = st.get("skin", "")
-        thick = 22 if is_main else 14
-        dark_b = mix(base, (0, 0, 0), 0.55)
-        lite_b = mix(base, (255, 255, 255), 0.35)
-        side_b = mix(base, (0, 0, 0), 0.35)
+        thick = 24 if is_main else 14
+        upper = mix(base, (255, 255, 255), 0.20)
+        lower = mix(base, (0, 0, 0), 0.28)
+        side_b = mix(base, (0, 0, 0), 0.30)
         pulse = 0.5 + 0.5 * math.sin(self.t_global * 3 + pi)
-        # drop shadow + extruded 3D side/end caps
-        pygame.draw.rect(self.screen, (10, 12, 20), (x - 6, y + 8, w + 12, thick + 12), border_radius=8)
-        dd = 15 if not is_main else 20
-        pygame.draw.polygon(self.screen, side_b,
-                            [(x + w, y + 2), (x + w + dd, y + 10), (x + w + dd, y + 10 + thick),
-                             (x + w, y + thick)])
-        pygame.draw.polygon(self.screen, mix(base, (0, 0, 0), 0.7),
-                            [(x, y + 2), (x - dd, y + 10), (x - dd, y + 10 + thick), (x, y + thick)])
-        pygame.draw.rect(self.screen, dark_b, (x, y + 6, w, thick - 4), border_radius=7)
-        pygame.draw.rect(self.screen, base, (x, y, w, 12 if not is_main else 14), border_radius=6)
-        pygame.draw.rect(self.screen, lite_b, (x, y, w, 4), border_radius=2)
-        pygame.draw.line(self.screen, (255, 255, 255), (x + 3, y + 1), (x + w - 3, y + 1), 1)
-        # --- material top pattern ---
-        if skin in ("obsidian", "magmarock"):
-            for ci in range(max(2, int(w // 130))):
-                cx2 = x + 30 + ci * (w - 60) / max(1, max(2, int(w // 130)) - 1)
-                if int(self.t_global * 3 + ci + pi) % 2 == 0:
-                    pygame.draw.line(self.screen, (255, 140, 60), (cx2, y + 4), (cx2 + 16, y + 4), 2)
-        elif skin in ("marble", "harbor", "keep", "spire", "sandstone"):
-            for sx in range(int(x + 40), int(x + w - 8), 44):
-                pygame.draw.line(self.screen, dark_b, (sx, y + 2), (sx, y + 11), 2)
-        elif skin in ("voidcrystal", "rift", "station"):
-            for sx in range(int(x + 26), int(x + w - 8), 52):
-                pygame.draw.line(self.screen, lite_b, (sx, y + 2), (sx + 12, y + 11), 2)
-            for sx in range(int(x + 40), int(x + w - 8), 78):
-                pygame.draw.circle(self.screen, glow, (sx, int(y + 6)), 2)
-        elif skin in ("shroom", "bark", "thorn"):
-            for sx in range(int(x + 22), int(x + w - 8), 40):
-                pygame.draw.circle(self.screen, mix(base, (200, 255, 190), 0.25), (sx, int(y + 7)), 3)
-            pygame.draw.line(self.screen, mix(base, (0, 0, 0), 0.4), (x + 4, y + 11), (x + w - 4, y + 11), 1)
-        elif skin == "abyss":
-            pygame.draw.line(self.screen, (220, 245, 255), (x + 8, y + 9), (x + w // 3, y + 3), 2)
-        elif skin in ("foundry", "brass"):
-            for rx in range(int(x + 14), int(x + w - 6), 34):
-                pygame.draw.circle(self.screen, dark_b, (rx, int(y + 9)), 2)
-            for ex in (x + 2, x + w - 14):
-                pygame.draw.rect(self.screen, (255, 200, 90), (ex, y + 2, 12, 8))
-                pygame.draw.line(self.screen, (30, 20, 15), (ex + 2, y + 2), (ex + 10, y + 10), 2)
+        # distinct top-surface material, always kept light so it reads
+        # against any background (the Battlefield grass-top equivalent)
+        if skin in ("shroom", "bark", "thorn"):
+            surf = mix(base, (250, 240, 180), 0.62)
         elif skin == "frost":
-            pygame.draw.rect(self.screen, (250, 252, 255), (x, y, w, 3), border_radius=2)
-            pygame.draw.line(self.screen, (200, 230, 245), (x + 10, y + 10), (x + w // 2, y + 4), 2)
+            surf = (213, 227, 243)
+        elif skin in ("obsidian", "magmarock"):
+            surf = mix(base, (255, 200, 150), 0.55)
+        elif skin in ("voidcrystal", "rift", "station"):
+            surf = mix(base, (255, 255, 255), 0.55)
+        elif skin in ("foundry", "brass"):
+            surf = mix(base, (255, 235, 200), 0.55)
+        elif skin == "abyss":
+            surf = (215, 240, 248)
         elif skin == "cloud":
-            for sx in range(int(x + 12), int(x + w - 4), 26):
-                pygame.draw.circle(self.screen, (255, 255, 255), (sx, int(y + 2)), 6)
-        # --- pulsing glow line + travelling spark ---
-        pygame.draw.line(self.screen, glow, (x, y + (18 if is_main else 15)),
-                         (x + w, y + (18 if is_main else 15)), 2)
-        pygame.draw.circle(self.glow_layer, (*glow, int(60 + 60 * pulse)),
-                           (int(x + w / 2), int(y + 15)), 5)
+            surf = (255, 243, 214)
+        else:
+            surf = mix(base, (255, 255, 255), 0.60)
+        # soft contact shadow (translucent, tight — no more black bar)
+        pygame.draw.ellipse(self.glow_layer, (0, 0, 0, 85), (x - 2, y + thick - 3, w + 4, 12))
+        # slim extruded side caps
+        dd = 7 if not is_main else 10
+        pygame.draw.polygon(self.screen, side_b,
+                            [(x + w, y + 3), (x + w + dd, y + 8), (x + w + dd, y + 8 + thick),
+                             (x + w, y + thick)])
+        pygame.draw.polygon(self.screen, mix(base, (0, 0, 0), 0.55),
+                            [(x, y + 3), (x - dd, y + 8), (x - dd, y + 8 + thick), (x, y + thick)])
+        # body with vertical gradient feel (light top half -> darker bottom)
+        pygame.draw.rect(self.screen, lower, (x, y + 6, w, thick - 6), border_radius=6)
+        pygame.draw.rect(self.screen, upper, (x, y + 6, w, (thick - 6) // 2 + 3),
+                         border_top_left_radius=6, border_top_right_radius=6)
+        # bright top surface band + crisp 2px light edge (readability first)
+        pygame.draw.rect(self.screen, surf, (x, y, w, 6), border_radius=3)
+        pygame.draw.line(self.screen, mix(surf, (255, 255, 255), 0.65), (x + 3, y + 1), (x + w - 3, y + 1), 2)
+        # shadow line under the surface: the white/blue sandwich that reads on snow
+        pygame.draw.line(self.screen, mix(surf, (0, 0, 0), 0.35), (x + 3, y + 6), (x + w - 3, y + 6), 2)
+        # thin dark rim frames the slab on any background (light or dark)
+        pygame.draw.rect(self.screen, mix(base, (0, 0, 0), 0.50), (x, y, w, thick), 1, border_radius=6)
+        # --- subtle material detail on the surface ---
+        if skin in ("obsidian", "magmarock"):
+            for ci in range(max(2, int(w // 150))):
+                cx2 = x + 30 + ci * (w - 60) / max(1, max(2, int(w // 150)) - 1)
+                if int(self.t_global * 3 + ci + pi) % 2 == 0:
+                    pygame.draw.line(self.screen, (255, 140, 60), (cx2, y + 2), (cx2 + 14, y + 2), 1)
+        elif skin in ("marble", "harbor", "keep", "spire", "sandstone"):
+            for sx in range(int(x + 40), int(x + w - 8), 48):
+                pygame.draw.line(self.screen, mix(surf, (0, 0, 0), 0.25), (sx, y + 1), (sx, y + 5), 1)
+        elif skin in ("voidcrystal", "rift", "station"):
+            for sx in range(int(x + 40), int(x + w - 8), 78):
+                pygame.draw.circle(self.screen, glow, (sx, int(y + 3)), 2)
+        elif skin in ("shroom", "bark", "thorn"):
+            for sx in range(int(x + 24), int(x + w - 8), 44):
+                pygame.draw.circle(self.screen, mix(surf, (0, 0, 0), 0.18), (sx, int(y + 3)), 2)
+        elif skin in ("foundry", "brass"):
+            for rx in range(int(x + 18), int(x + w - 8), 40):
+                pygame.draw.circle(self.screen, mix(surf, (0, 0, 0), 0.35), (rx, int(y + 8)), 2)
+            for ex in (x + 3, x + w - 11):
+                pygame.draw.rect(self.screen, (255, 200, 90), (ex, y + 1, 8, 5))
+        elif skin == "cloud":
+            for sx in range(int(x + 12), int(x + w - 4), 30):
+                pygame.draw.circle(self.screen, (255, 246, 224), (sx, int(y)), 6)
+        # --- slim glow trim + travelling spark ---
+        pygame.draw.line(self.screen, glow, (x + 2, y + thick - 2), (x + w - 2, y + thick - 2), 1)
+        pygame.draw.circle(self.glow_layer, (*glow, int(50 + 50 * pulse)),
+                           (int(x + w / 2), int(y + thick - 2)), 4)
         sx2 = x + ((self.t_global * 120 + pi * 170) % max(1, w))
-        pygame.draw.circle(self.screen, (255, 255, 255), (int(sx2), int(y + 15)), 2)
-        # --- corner caps (tech skins blink, others stay solid) ---
-        tech = skin in ("station", "brass", "foundry", "rift", "voidcrystal")
-        on = int(self.t_global * 2 + pi) % 2 == 0
-        c1 = (255, 220, 130) if (on or not tech) else (90, 70, 50)
-        c2 = (255, 220, 130) if ((not on) or not tech) else (90, 70, 50)
-        pygame.draw.circle(self.screen, c1, (int(x + 4), int(y + 4)), 2)
-        pygame.draw.circle(self.screen, c2, (int(x + w - 4), int(y + 4)), 2)
-        # --- hangers under floating platforms ---
+        pygame.draw.circle(self.screen, (255, 255, 255), (int(sx2), int(y + thick - 2)), 1)
+        # --- tech corner lights ---
+        if skin in ("station", "brass", "foundry", "rift", "voidcrystal"):
+            on = int(self.t_global * 2 + pi) % 2 == 0
+            pygame.draw.circle(self.screen, (255, 220, 130) if on else (90, 70, 50),
+                               (int(x + 5), int(y + 3)), 2)
+            pygame.draw.circle(self.screen, (255, 220, 130) if not on else (90, 70, 50),
+                               (int(x + w - 5), int(y + 3)), 2)
+        # --- Battlefield-style under-frame + pendant (floaters only) ---
         if not is_main:
-            if skin in ("marble", "keep", "harbor", "spire", "brass", "foundry", "sandstone"):
-                for chx in (x + 18, x + w - 18):
-                    sway = math.sin(self.t_global * 2 + chx * 0.05) * 4
-                    pygame.draw.line(self.screen, (40, 42, 55), (chx, y + 22), (chx + sway, y + 52), 2)
-                    pygame.draw.circle(self.screen, (60, 62, 78), (int(chx + sway), int(y + 54)), 3)
-            elif skin in ("shroom", "bark", "thorn"):
-                for chx in (x + 18, x + w - 18):
-                    sway = math.sin(self.t_global * 1.6 + chx * 0.06) * 6
-                    pygame.draw.line(self.screen, (60, 120, 70), (chx, y + 20), (chx + sway, y + 50), 3)
-                    pygame.draw.circle(self.screen, (120, 200, 120), (int(chx + sway), int(y + 46)), 3)
-            elif skin in ("voidcrystal", "rift", "obsidian", "magmarock", "station", "abyss"):
-                cx0 = x + w / 2
-                bob = math.sin(self.t_global * 1.8 + x * 0.05) * 3
-                pygame.draw.polygon(self.screen, side_b,
-                                    [(cx0 - 9, y + 20), (cx0 + 9, y + 20), (cx0, y + 38 + bob)])
-                pygame.draw.line(self.screen, glow, (cx0 - 9, y + 20), (cx0, y + 38 + bob), 1)
-                pygame.draw.circle(self.glow_layer, (*glow, 60), (int(cx0), int(y + 30)), 10)
-            elif skin == "frost":
-                for ix in range(int(x + 20), int(x + w - 8), 34):
-                    pygame.draw.polygon(self.screen, (200, 230, 245),
-                                        [(ix, y + 20), (ix + 10, y + 20), (ix + 5, y + 34)])
-            elif skin == "cloud":
+            if skin == "cloud":
                 for px in (x + 24, x + w - 24):
-                    pygame.draw.circle(self.screen, (245, 248, 255), (int(px), int(y + 24)), 8)
-                    pygame.draw.circle(self.screen, (225, 232, 245), (int(px + 10), int(y + 28)), 6)
+                    pygame.draw.circle(self.screen, (245, 248, 255), (int(px), int(y + thick + 4)), 7)
+            else:
+                cx0 = x + w / 2
+                bob = math.sin(self.t_global * 1.8 + x * 0.05) * 2
+                pygame.draw.line(self.screen, side_b, (x + 12, y + thick - 1),
+                                 (cx0, y + thick + 13 + bob), 3)
+                pygame.draw.line(self.screen, side_b, (x + w - 12, y + thick - 1),
+                                 (cx0, y + thick + 13 + bob), 3)
+                py0 = y + thick + 13 + bob
+                if skin in ("voidcrystal", "rift", "obsidian", "magmarock", "station", "abyss"):
+                    pygame.draw.polygon(self.screen, glow,
+                                        [(cx0 - 5, py0 - 6), (cx0 + 5, py0 - 6), (cx0, py0 + 8)])
+                else:
+                    pygame.draw.polygon(self.screen, glow,
+                                        [(cx0, py0 - 7), (cx0 + 5, py0), (cx0, py0 + 7), (cx0 - 5, py0)])
+                pygame.draw.circle(self.glow_layer, (*glow, 55), (int(cx0), int(py0)), 9)
+                if skin == "frost":
+                    for ix in (x + 22, x + w - 22):
+                        pygame.draw.polygon(self.screen, (205, 232, 245),
+                                            [(ix, y + thick - 1), (ix + 8, y + thick - 1), (ix + 4, y + thick + 10)])
+                elif skin in ("shroom", "bark", "thorn"):
+                    pygame.draw.circle(self.screen, (120, 200, 120), (int(cx0 - 8), int(py0 + 2)), 2)
 
     def _main_supports(self, m, st, shake_x, shake_y):
         skin = st.get("skin", "")
@@ -4765,10 +4782,11 @@ class Game:
                                      (cx0 + 8, my0 + 100), (cx0 - 8, my0 + 100)])
                 pygame.draw.line(self.screen, (240, 248, 255), (cx0 - 8, my0 + 34), (cx0 - 4, my0 + 94), 2)
         else:
+            pcol = mix(st["plat"], (0, 0, 0), 0.45)
             for fxr in (0.2, 0.5, 0.8):
                 cx0 = mx0 + mw * fxr
-                pygame.draw.rect(self.screen, (14, 15, 24), (cx0 - 9, my0 + 34, 18, 66))
-                pygame.draw.rect(self.screen, mix(st["plat"], (0, 0, 0), 0.4),
+                pygame.draw.rect(self.screen, pcol, (cx0 - 9, my0 + 34, 18, 66))
+                pygame.draw.rect(self.screen, mix(st["plat"], (255, 255, 255), 0.2),
                                  (cx0 - 9, my0 + 34, 18, 8))
 
     def _main_dressing(self, m, st, shake_x, shake_y):
@@ -4891,7 +4909,7 @@ class Game:
                           if d["x"] == b["x"] and d["y"] == b["y"]), 3)
             frac = b["hp"] / max(1, maxhp)
             base = mix(st["plat"], (60, 30, 20), 0.35 * (1 - frac))
-            pygame.draw.rect(self.screen, (10, 12, 20), (bx - 4, by + 8, bw + 8, 24), border_radius=7)
+            pygame.draw.ellipse(self.glow_layer, (0, 0, 0, 80), (bx - 2, by + 12, bw + 4, 12))
             pygame.draw.rect(self.screen, mix(base, (0, 0, 0), 0.35), (bx, by + 6, bw, 14), border_radius=6)
             pygame.draw.rect(self.screen, base, (bx, by, bw, 13), border_radius=6)
             pygame.draw.rect(self.screen, (255, 220, 160), (bx, by, bw, 4), border_radius=2)
@@ -5466,7 +5484,7 @@ class Game:
                     px, pw2 = x + 12 + pl["x"] * k, max(5, pl["w"] * k)
                     py = oy - (430 - pl["y"]) * 0.06
                     pygame.draw.rect(self.screen, STAGES[i]["plat"], (px, py, pw2, 3), border_radius=2)
-                    pygame.draw.line(self.screen, STAGES[i]["glow"], (px, py + 3, px + pw2, py + 3), 1)
+                    pygame.draw.line(self.screen, STAGES[i]["glow"], (px, py + 3), (px + pw2, py + 3), 1)
                 for b in STAGES[i].get("breakables", []):
                     px, pw2 = x + 12 + b["x"] * k, max(5, b["w"] * k)
                     py = oy - (430 - b["y"]) * 0.06
