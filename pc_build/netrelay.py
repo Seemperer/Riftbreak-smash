@@ -13,7 +13,19 @@ try:
 except Exception:
     mqtt = None
 
-BROKERS = [("broker.emqx.io", 1883), ("test.mosquitto.org", 1883)]
+# Tried in order. Raw MQTT (1883) is fastest where allowed; plain-WebSocket
+# entries (8083/8080) look like normal web traffic and pass through school
+# firewalls that block 1883. Same plaintext privacy as before — no accounts,
+# no secrets, just throwaway room codes and game positions.
+ENDPOINTS = [
+    # (host, port, transport, ws_path)
+    ("broker.emqx.io", 1883, "tcp", ""),
+    ("test.mosquitto.org", 1883, "tcp", ""),
+    ("broker.emqx.io", 8083, "websockets", "/mqtt"),
+    ("test.mosquitto.org", 8080, "websockets", "/mqtt"),
+]
+# Back-compat alias (host, port) for anything iterating BROKERS.
+BROKERS = [(h, p) for h, p, _, _ in ENDPOINTS]
 TOPIC_ROOT = "riftbreak/v1"
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
@@ -34,6 +46,20 @@ def _decode(payload):
     if isinstance(m, dict) and "t" in m:
         return m
     return None
+
+
+def _reachable(host, port, timeout=3.0):
+    """Quick TCP probe so a firewalled endpoint fails fast instead of hanging."""
+    import socket as _socket
+    try:
+        s = _socket.create_connection((host, port), timeout)
+        try:
+            s.close()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
 
 
 class RelayPeer:
@@ -58,9 +84,15 @@ class RelayPeer:
         if mqtt is None:
             return "need: pip install paho-mqtt"
         errs = []
-        for host, port in BROKERS:
+        for host, port, transport, path in ENDPOINTS:
+            # Bound each attempt: firewalled ports hang a raw connect for ages.
+            if not _reachable(host, port, 3.0):
+                errs.append(f"{host}:{port}: unreachable")
+                continue
             try:
-                c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+                c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport=transport)
+                if transport == "websockets":
+                    c.ws_set_options(path=path or "/mqtt")
                 c.reconnect_delay_set(1, 4)
                 c.on_message = self._on_message
                 c.connect(host, port, timeout)
@@ -68,10 +100,11 @@ class RelayPeer:
                 # NOTE: no loop_start() — pump() drives client.loop() on this
                 # thread only. Mixing both corrupts the stream.
                 self.client = c
-                self.broker = f"{host}:{port}"
+                tag = "ws" if transport == "websockets" else "mqtt"
+                self.broker = f"{host}:{port}({tag})"
                 return ""
             except Exception as e:
-                errs.append(f"{host}: {str(e)[:50]}")
+                errs.append(f"{host}:{port}: {str(e)[:50]}")
         return "no broker reachable (" + "; ".join(errs) + ")"
 
     def _on_message(self, client, userdata, msg):

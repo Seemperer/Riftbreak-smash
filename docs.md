@@ -171,7 +171,9 @@ for both.
 - Protocol (same messages on both transports): guest→host `in`/`pick`/`pause`/`ping`;
   host→guest `hello`/`snap`/`lobby`/`pong`/`bye`. LAN uses `pc_build/netplay.py` (JSON
   lines over TCP); internet rooms use `pc_build/netrelay.py` (same JSON over public-MQTT
-  topics `riftbreak/v1/<CODE>/h2g|g2h`, handshake at QoS 1). Snapshots are fully
+  topics `riftbreak/v1/<CODE>/h2g|g2h`, handshake at QoS 1). The relay tries raw MQTT
+  (1883) first, then firewall-friendly plain-WebSocket ports (8083/8080, normal web
+  traffic) with a fast reachability probe per endpoint, so school networks usually work. Snapshots are fully
   self-contained (fighters, projectiles, rings, slashes, drops, timer, phase, announce,
   pause, winner), so a dropped packet is just an old frame. Hello retransmits until
   guest input arrives.
@@ -189,8 +191,9 @@ for both.
   No Python, no admin, no install needed on the other PC.
 - First launch: Windows SmartScreen may warn (unknown publisher) → "More info" → "Run
   anyway". Saves/streak live in `%USERPROFILE%\.riftbreak\save.json`, per Windows user.
-- School networks: INTERNET ROOM needs outbound TCP 1883 (try it first); same-lab LAN
-  play needs the host PC allowed inbound TCP 7001 (joining needs nothing special). If
-  the school blocks both, host a phone hotspot and join that WiFi with both PCs.
+- School networks: INTERNET ROOM tries direct MQTT first, then firewall-friendly web
+  ports automatically — usually no hotspot needed. Same-lab LAN play needs the host PC
+  allowed inbound TCP 7001 (joining needs nothing special). Last resort: phone hotspot
+  and both PCs on that WiFi.
 - Camera is glued to YOUR fighter (position + velocity lookahead); the foe can leave
   the frame — their percent/stocks stay visible in the slim HUD.
