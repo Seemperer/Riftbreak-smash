@@ -42,6 +42,14 @@ def _user_dir():
 
 SAVE_PATH = os.path.join(_user_dir(), "save.json")
 
+
+def asset_base():
+    """Folder holding the bundled assets dir. PyInstaller onefile unpacks
+    data files to sys._MEIPASS; plain Python uses the source tree."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "assets")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
 STAGES = [
     # --- 1. EMBER ARENA: volcano duel. Wide main, 2 solid sides, crumbling crown. ---
     {"name": "Ember Arena", "top": (46, 12, 22), "bot": (130, 45, 25),
@@ -2043,8 +2051,8 @@ class Game:
                     if d in self.drops:
                         self.drops.remove(d)
                     break
-        # camera follows the PLAYER (biased toward the foe + velocity lookahead)
-        anchor = p1.x * 0.72 + cpu.x * 0.28 + p1.vx * 0.22
+        # camera glued to the PLAYER (position + velocity lookahead only)
+        anchor = p1.x + p1.vx * 0.25
         sw = STAGES[self.stage_idx].get("w", W)
         tgt = max(0, min(sw - W, anchor - W / 2))
         self.cam += (tgt - self.cam) * min(1, 5 * dt)
@@ -3011,7 +3019,7 @@ class Game:
         Missing packs fall back to the procedural 3D rig automatically."""
         out = {}
         if base is None:
-            base = os.path.join(os.path.dirname(__file__), "assets", "fighters")
+            base = os.path.join(asset_base(), "fighters")
         try:
             cids = sorted(os.listdir(base))
         except Exception:
@@ -3081,8 +3089,8 @@ class Game:
         Optional <stem>_mid.png (transparent) draws as a parallax mid layer."""
         out = {}
         if base is None:
-            base = os.path.join(os.path.dirname(__file__), "assets", "stages")
-        mp = os.path.join(os.path.dirname(__file__), "assets", manifest)
+            base = os.path.join(asset_base(), "stages")
+        mp = os.path.join(asset_base(), manifest)
         try:
             with open(mp) as fh:
                 mapping = json.load(fh)
@@ -4454,6 +4462,29 @@ class Game:
             by = 150 + i * 60 + math.sin(t * 2 + i) * 10
             pygame.draw.arc(self.screen, (60, 40, 55), (int(bx - 10), int(by - 4), 20, 10), 3.4, 6.0, 2)
 
+    def _bg_haze(self, idx):
+        """Smash-style atmospheric perspective: a cached translucent wash that
+        pushes the background back so platforms and fighters pop."""
+        cache = getattr(self, "_haze_cache", None)
+        if cache is None:
+            cache = self._haze_cache = {}
+        ov = cache.get(idx)
+        if ov is None:
+            st = STAGES[idx]
+            tint = mix(st["bot"], (232, 238, 248), 0.55)
+            ov = pygame.Surface((W, H), pygame.SRCALPHA)
+            for y in range(120, H, 6):
+                if y < 300:
+                    a = int(46 * (y - 120) / 180)
+                elif y < 430:
+                    a = 46
+                else:
+                    a = int(46 - 22 * (y - 430) / max(1, H - 430))
+                if a > 0:
+                    pygame.draw.rect(ov, (*tint, a), (0, y, W, 6))
+            cache[idx] = ov
+        self.screen.blit(ov, (0, 0))
+
     def draw_bg(self, idx, camx=0):
         st = STAGES[idx]
         self.gradient(st["top"], st["bot"])
@@ -4482,6 +4513,7 @@ class Game:
         }.get(st["name"])
         if _paint is not None:
             _paint(st, camx, fx, mx, t, L)
+            self._bg_haze(idx)
             return
         if st["deco"] == "ember":
             # volcano silhouettes + glowing crater + lava floor glow

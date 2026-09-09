@@ -175,3 +175,18 @@ for both.
   guest pause/game-over buttons are host-gated to prevent desyncs.
 
 *End of docs — single source of truth. If code and this file disagree, this file wins; update code to match.*
+
+## 14. Sharing the exe (website / school PCs)
+
+- Build: `pyinstaller --noconfirm --onefile --windowed --name RiftbreakSmash --paths
+  pc_build --hidden-import netplay --hidden-import netrelay --hidden-import fighters
+  --add-data "pc_build/assets;assets" pc_build/main.py` (recipe also saved in
+  `RiftbreakSmash.spec`). Upload the single file `dist/RiftbreakSmash.exe` (~17MB).
+  No Python, no admin, no install needed on the other PC.
+- First launch: Windows SmartScreen may warn (unknown publisher) → "More info" → "Run
+  anyway". Saves/streak live in `%USERPROFILE%\.riftbreak\save.json`, per Windows user.
+- School networks: INTERNET ROOM needs outbound TCP 1883 (try it first); same-lab LAN
+  play needs the host PC allowed inbound TCP 7001 (joining needs nothing special). If
+  the school blocks both, host a phone hotspot and join that WiFi with both PCs.
+- Camera is glued to YOUR fighter (position + velocity lookahead); the foe can leave
+  the frame — their percent/stocks stay visible in the slim HUD.
