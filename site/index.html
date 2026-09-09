@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RIFTBREAK SMASH — free 1v1 arena battler for PC</title>
 <meta name="description" content="Riftbreak Smash: a free Smash-like 1v1 arena battler. 10 fighters, 18 stages, online rooms. Download for Windows.">
+<meta name="theme-color" content="#0b0b14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b14'/%3E%3Cpath d='M16 4l9 6v8l-9 6-9-6v-8z' fill='none' stroke='%23ffd97a' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='15' r='3.5' fill='%23ff7a3c'/%3E%3C/svg%3E">
 <style>
   :root { color-scheme: dark; --gold: #ffd97a; --bg: #0b0b14; --card: #141422; --line: #2c2c44; }
   * { box-sizing: border-box; }
@@ -89,38 +91,104 @@
   .faq summary { cursor: pointer; font-weight: 700; color: var(--gold); }
   .faq p { margin: 10px 0 2px; color: #c6c6dc; line-height: 1.55; }
   a { color: var(--gold); }
+  a:focus-visible, .dl:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   footer { margin-top: 60px; color: #6d6d88; font-size: 13px; text-align: center; }
+  .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .badges span { border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+                 padding: 3px 14px; font-size: 12.5px; color: #b9b9d0; }
+
+  /* ---------- nav ---------- */
+  nav.top { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px);
+            background: rgba(11,11,20,.78); border-bottom: 1px solid var(--line); }
+  nav.top .in { max-width: 960px; margin: 0 auto; padding: 10px 20px;
+                display: flex; align-items: center; gap: 4px; }
+  nav.top .logo { font-weight: 900; letter-spacing: 2px; color: var(--gold); text-decoration: none;
+                  margin-right: auto; font-size: 15px; }
+  nav.top a.lnk { color: #c6c6dc; text-decoration: none; font-size: 14px; padding: 7px 12px;
+                  border-radius: 8px; transition: background .25s, color .25s; }
+  nav.top a.lnk:hover { background: #1d1d33; color: #fff; }
+  nav.top a.lnk.act { color: var(--gold); background: #1d1d33; }
+  nav.top a.mini { background: linear-gradient(180deg, #ffcb5e, #ff9f2e); color: #1a1206;
+                   font-weight: 800; text-decoration: none; font-size: 14px; padding: 8px 18px;
+                   border-radius: 9px; margin-left: 8px; }
+  @media (max-width: 640px) { nav.top a.lnk { display: none; } }
+
+  /* ---------- hero extras ---------- */
+  .btnrow { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+            animation: fadeUp 1s .3s ease both; }
+  .ghost { display: inline-flex; align-items: center; padding: 17px 30px; border-radius: 14px;
+           border: 1px solid #3d3d5c; color: #e8e8f5; text-decoration: none; font-weight: 700;
+           font-size: 17px; transition: border-color .25s, background .25s; }
+  .ghost:hover { border-color: var(--gold); background: #161628; }
+  .dl { animation: pulse 2.4s 1.2s ease-in-out infinite; }
+  .stats { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+           margin: 34px auto 0; animation: fadeUp 1s .45s ease both; }
+  .stats div { background: rgba(20,20,34,.8); border: 1px solid var(--line); border-radius: 12px;
+               padding: 12px 26px; text-align: center; }
+  .stats b { display: block; font-size: 26px; color: var(--gold); }
+  .stats span { font-size: 12.5px; color: #9a9ab5; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ---------- back to top ---------- */
+  #top { position: fixed; right: 22px; bottom: 22px; z-index: 10; width: 46px; height: 46px;
+         border-radius: 50%; border: 1px solid var(--line); background: rgba(20,20,34,.9);
+         color: var(--gold); font-size: 20px; cursor: pointer; opacity: 0; pointer-events: none;
+         transition: opacity .3s, transform .3s; }
+  #top.show { opacity: 1; pointer-events: auto; }
+  #top:hover { transform: translateY(-3px); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; }
+  }
 </style>
 </head>
 <body>
 <canvas id="fx"></canvas>
-<div class="wrap">
+<nav class="top"><div class="in">
+  <a class="logo" href="#top-anchor">RIFTBREAK</a>
+  <a class="lnk" href="#arenas">Arenas</a>
+  <a class="lnk" href="#roster">Fighters</a>
+  <a class="lnk" href="#online">Online</a>
+  <a class="lnk" href="#faq">FAQ</a>
+  <a class="mini" href="https://github.com/Seemperer/Riftbreak-smash/releases">Download</a>
+</div></nav>
+<div class="wrap" id="top-anchor">
 
   <header class="hero">
     <div class="kicker">A free Smash-like arena battler for PC</div>
     <h1>RIFTBREAK SMASH</h1>
     <p class="tag">10 fighters. 18 arenas. Online rooms with a 5-letter code. No install, no accounts — just run it and fight.</p>
+    <div class="btnrow">
     <a class="dl" href="https://github.com/Seemperer/Riftbreak-smash/releases">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/></svg>
       Download for Windows
     </a>
+    <a class="ghost" href="https://github.com/Seemperer/Riftbreak-smash">View source</a>
+    </div>
     <p class="sub">~17MB single .exe &middot; Windows 10/11 &middot; free forever</p>
+    <div class="stats">
+      <div><b>10</b><span>fighters</span></div>
+      <div><b>18</b><span>arenas</span></div>
+      <div><b>3</b><span>ways to play</span></div>
+      <div><b>0</b><span>cost ever</span></div>
+    </div>
     <div class="hero-shot"><img src="images/the_rift.png" alt="The Rift arena"></div>
   </header>
 
   <div class="marquee"><span>CINDER VEX &nbsp;•&nbsp; DISC MARO &nbsp;•&nbsp; ARC VOLTA &nbsp;•&nbsp; BULWARK BOONE &nbsp;•&nbsp; GLASS SHARD &nbsp;•&nbsp; NULL HOLLOW &nbsp;•&nbsp; BLINK PRYOR &nbsp;•&nbsp; TECTON OSMOND &nbsp;•&nbsp; ECHO VANE &nbsp;•&nbsp; LEECH MOSS &nbsp;•&nbsp;CINDER VEX &nbsp;•&nbsp; DISC MARO &nbsp;•&nbsp; ARC VOLTA &nbsp;•&nbsp; BULWARK BOONE &nbsp;•&nbsp; GLASS SHARD &nbsp;•&nbsp; NULL HOLLOW &nbsp;•&nbsp; BLINK PRYOR &nbsp;•&nbsp; TECTON OSMOND &nbsp;•&nbsp; ECHO VANE &nbsp;•&nbsp; LEECH MOSS &nbsp;•&nbsp;</span></div>
 
-  <section class="reveal">
+  <section class="reveal" id="arenas">
     <h2>Arenas</h2>
     <div class="gallery">
-      <figure><img src="images/sky_battlefield.png" alt="Sky Battlefield"><figcaption><b>Sky Battlefield</b> — pure tri-platform, no hazards. For settled scores.</figcaption></figure>
-      <figure><img src="images/magma_core.png" alt="Magma Core"><figcaption><b>Magma Core</b> — volcano arena. Mind the lava.</figcaption></figure>
-      <figure><img src="images/sunset_keep.png" alt="Sunset Keep"><figcaption><b>Sunset Keep</b> — castle at dusk, breakable ground.</figcaption></figure>
-      <figure><img src="images/the_rift.png" alt="The Rift"><figcaption><b>The Rift</b> — void vortex. Gravity gets weird.</figcaption></figure>
+      <figure><img loading="lazy" src="images/sky_battlefield.png" alt="Sky Battlefield"><figcaption><b>Sky Battlefield</b> — pure tri-platform, no hazards. For settled scores.</figcaption></figure>
+      <figure><img loading="lazy" src="images/magma_core.png" alt="Magma Core"><figcaption><b>Magma Core</b> — volcano arena. Mind the lava.</figcaption></figure>
+      <figure><img loading="lazy" src="images/sunset_keep.png" alt="Sunset Keep"><figcaption><b>Sunset Keep</b> — castle at dusk, breakable ground.</figcaption></figure>
+      <figure><img loading="lazy" src="images/the_rift.png" alt="The Rift"><figcaption><b>The Rift</b> — void vortex. Gravity gets weird.</figcaption></figure>
     </div>
   </section>
 
-  <section class="reveal">
+  <section class="reveal" id="roster">
     <h2>The roster</h2>
     <div class="roster">
       <div class="fighter" style="--c:#ff5a3c"><b>CINDER VEX</b><p>Meteor delayed strike — marks the foe's ground, then the sky falls.</p></div>
@@ -145,7 +213,7 @@
     </ol>
   </section>
 
-  <section class="reveal">
+  <section class="reveal" id="online">
     <h2>Play with friends online</h2>
     <ol>
       <li>Host: <b>ONLINE → INTERNET ROOM → HOST ROOM</b> — you get a 5-letter room code.</li>
@@ -177,11 +245,11 @@
   <section class="reveal">
     <h2>More arenas</h2>
     <div class="gallery">
-      <figure><img src="images/harbor_town.png" alt="Harbor Town" loading="lazy"><figcaption><b>Harbor Town</b> — plaza brawl by the water.</figcaption></figure>
-      <figure><img src="images/world_tree.png" alt="World Tree" loading="lazy"><figcaption><b>World Tree</b> — great tree island, gaps everywhere.</figcaption></figure>
-      <figure><img src="images/hollow_star.png" alt="Hollow Star" loading="lazy"><figcaption><b>Hollow Star</b> — orbital station, tight platforms.</figcaption></figure>
-      <figure><img src="images/glacier.png" alt="Glacier" loading="lazy"><figcaption><b>Glacier</b> — slippery summit under the aurora.</figcaption></figure>
-      <figure><img src="images/iron_foundry.png" alt="Iron Foundry" loading="lazy"><figcaption><b>Iron Foundry</b> — skull fortress, heavy metal.</figcaption></figure>
+      <figure><img loading="lazy" src="images/harbor_town.png" alt="Harbor Town" loading="lazy"><figcaption><b>Harbor Town</b> — plaza brawl by the water.</figcaption></figure>
+      <figure><img loading="lazy" src="images/world_tree.png" alt="World Tree" loading="lazy"><figcaption><b>World Tree</b> — great tree island, gaps everywhere.</figcaption></figure>
+      <figure><img loading="lazy" src="images/hollow_star.png" alt="Hollow Star" loading="lazy"><figcaption><b>Hollow Star</b> — orbital station, tight platforms.</figcaption></figure>
+      <figure><img loading="lazy" src="images/glacier.png" alt="Glacier" loading="lazy"><figcaption><b>Glacier</b> — slippery summit under the aurora.</figcaption></figure>
+      <figure><img loading="lazy" src="images/iron_foundry.png" alt="Iron Foundry" loading="lazy"><figcaption><b>Iron Foundry</b> — skull fortress, heavy metal.</figcaption></figure>
     </div>
     <p style="color:#8f8fa8">…plus 9 more, 18 in total: lava, spikes, wind, ice, breakable floors, moving platforms, shifting gravity.</p>
   </section>
@@ -196,7 +264,7 @@
     </div>
   </section>
 
-  <section class="reveal">
+  <section class="reveal" id="faq">
     <h2>FAQ</h2>
     <div class="faq">
       <details><summary>Is it really free?</summary><p>Yes. No ads, no accounts, no microtransactions. One exe, full game.</p></details>
@@ -214,10 +282,12 @@
   </section>
 
   <footer>
+    <div class="badges"><span>v1.0 playable</span><span>Windows 10/11</span><span>~17MB</span><span>free forever</span></div>
     Free fan-made battler. Source &amp; updates on
     <a href="https://github.com/Seemperer/Riftbreak-smash">GitHub</a>.
   </footer>
 </div>
+<button id="top" title="Back to top" aria-label="Back to top">↑</button>
 
 <script>
 // drifting embers background
@@ -252,6 +322,23 @@
     es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } });
   }, { threshold: .12 });
   els.forEach(function (e) { io.observe(e); });
+})();
+// back to top + nav highlight
+(function () {
+  var btn = document.getElementById('top');
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.top a.lnk'));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  btn.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  var secs = Object.keys(map).map(function (id) { return document.getElementById(id); })
+    .filter(function (el) { return !!el; });
+  function onScroll() {
+    btn.classList.toggle('show', window.scrollY > 600);
+    var cur = null, y = window.scrollY + 120;
+    secs.forEach(function (s) { if (s.offsetTop <= y) cur = s.id; });
+    links.forEach(function (a) { a.classList.toggle('act', a.getAttribute('href') === '#' + cur); });
+  }
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
 })();
 </script>
 </body>
