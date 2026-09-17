@@ -3,3 +3,7 @@ __pycache__/
 pc_build/save.json
 build/
 dist/
+node_modules/
+.vercel/
+.env
+.env.*

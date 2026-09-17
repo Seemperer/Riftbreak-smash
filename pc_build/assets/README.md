@@ -3,6 +3,9 @@
 The game renders fighters procedurally by default. Drop real 3D art here
 and it is used automatically, no code changes needed.
 
+The game renders fighters procedurally by default. Drop real 3D art here
+and it is used automatically, no code changes needed.
+
 ## Folder layout
 
 ```
@@ -58,7 +61,6 @@ automatically at 10 fps.
   T-pose neutral" first, then per-pose variations from the same seed/model.
 - If your tool exports a sheet instead of files: slice it into the PNGs
   above (any free tool works), keeping the 160x160 canvas + anchor.
-
 ## Stage paintings (AI-generated backgrounds)
 
 Save each stage painting as a **PNG or JPG** in `pc_build/assets/stages/`
@@ -66,24 +68,15 @@ using EXACTLY these filenames (rename your downloads to match):
 
 | File | Stage it skins |
 |---|---|
-| `ember_arena.png` | Ember Arena (twin volcanoes, obsidian arch) |
 | `sky_battlefield.png` | Sky Battlefield (floating sky ruins) |
-| `void_final.png` | Void Final (void monoliths) |
-| `fungal_hollow.png` | Fungal Hollow (glowing mushroom grove) |
-| `storm_spire.png` | Storm Spire (lightning tower) |
-| `tide_vault.png` | Tide Vault (sunken vault) |
-| `iron_foundry.png` | Iron Foundry (skull fortress) |
-| `thorn_garden.png` | Thorn Garden (moonlit briar) |
-| `glacier.png` | Glacier (ice aurora) |
-| `dune_sea.png` | Dune Sea (desert obelisk) |
-| `hollow_star.png` | Hollow Star (orbital station) |
-| `clockwork.png` | Clockwork (brass engine room) |
 | `magma_core.png` | Magma Core (volcano arena) |
-| `cloud_nine.png` | Cloud Nine (rainbow sky) |
-| `the_rift.png` | The Rift (void vortex) |
+| `glacier.png` | Glacier (aurora ice field) |
+| `iron_foundry.png` | Iron Foundry (skull fortress) |
+| `hollow_star.png` | Hollow Star (orbital station) |
 | `harbor_town.png` | Harbor Town (plaza) |
 | `world_tree.png` | World Tree (great tree island) |
 | `sunset_keep.png` | Sunset Keep (castle at dusk) |
+| `the_rift.png` | The Rift (void vortex) |
 
 The mapping lives in `pc_build/assets/stages.json` (stage name → file).
 Optional: add `<same-name>_mid.png` (transparent PNG) for a parallax

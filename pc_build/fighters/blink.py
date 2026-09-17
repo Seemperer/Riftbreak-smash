@@ -1,4 +1,4 @@
-"""BLINK PRYOR — Rift Courier. The ONLY fighter with a TRIPLE jump. Impossible to edgeguard cleanly."""
+"""BLINK — Rift Courier. The ONLY fighter with a TRIPLE jump. Impossible to edgeguard cleanly."""
 
 CID = "blink"
 

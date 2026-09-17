@@ -2,7 +2,7 @@
 
 Every module exposes:
   CID: str            - stable character id
-  DATA: dict          - name/title/ability/desc/story/skin/stats/proj/up/down (+ air_jumps)
+  DATA: dict          - name/title/ability/desc/skin/stats/proj/up/down (+ air_jumps)
   TRAITS: dict        - AI hints, e.g. {"zoner": True, "heavy": True}
 
 Unique mechanics live in the engine (main.py) keyed by CID, so the

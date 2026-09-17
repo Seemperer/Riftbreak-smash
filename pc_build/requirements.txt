@@ -1,2 +1,2 @@
 pygame
-paho-mqtt
+websocket-client

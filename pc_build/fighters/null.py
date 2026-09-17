@@ -1,4 +1,4 @@
-"""NULL HOLLOW — Gravity Well. DOWN-B births a drifting well that drags the foe in, then implodes."""
+"""NULL — Gravity Well. DOWN-B births a drifting well that drags the foe in, then implodes."""
 
 CID = "null"
 

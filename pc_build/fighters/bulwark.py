@@ -1,4 +1,4 @@
-"""BULWARK BOONE — Living Fortress. Cannot be launched while charging a smash. Heaviest in the game."""
+"""BULWARK — Living Fortress. Cannot be launched while charging a smash. Heaviest in the game."""
 
 CID = "bulwark"
 

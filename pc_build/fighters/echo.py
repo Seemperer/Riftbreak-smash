@@ -1,4 +1,4 @@
-"""ECHO VANE — Paradox Thief. DOWN-B drops an echo marker; press again to snap back to it."""
+"""ECHO — Paradox Thief. DOWN-B drops an echo marker; press again to snap back to it."""
 
 CID = "echo"
 

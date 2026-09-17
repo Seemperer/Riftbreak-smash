@@ -1,11 +1,11 @@
-"""GLASS SHARD — Glass Duelist. The only fighter that REFLECTS projectiles during a counter.
+"""GLASS — Glass Duelist. The only fighter that REFLECTS projectiles during a counter.
 Fragile: launched the furthest in the roster."""
 
 CID = "glass"
 
 DATA = {
     "name": "GLASS SHARD", "title": "Glass Duelist",
-    "ability": "DOWN-B: Mirror — punishes melee AND reflects projectiles back x1.5",
+    "ability": "DOWN-B: Mirror — punishes melee AND reflects projectiles back ×1.5",
     "desc": "Hits like a truck stop sign. Breaks like a promise. Time it right.",
     "story": "Shard was a cathedral window that watched one duel too many. She stepped out of the frame mid-swing and kept the worst of the light. Everything thrown at her comes back.",
     "skin": {"main": (150, 120, 220), "dark": (70, 50, 120), "trim": (230, 220, 255), "glow": (190, 150, 255)},

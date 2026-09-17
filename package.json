@@ -1,0 +1,16 @@
+{
+  "name": "riftbreak-smash-online",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "relay": "node relay/server.js",
+    "rooms:check": "node -e \"import('./relay/room-store.js').then(m=>console.log(m.roomStoreReady()?'redis ok':'REDIS_URL missing'))\""
+  },
+  "dependencies": {
+    "ioredis": "^5.8.2",
+    "ws": "^8.18.3"
+  }
+}

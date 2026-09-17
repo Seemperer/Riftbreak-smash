@@ -1,4 +1,4 @@
-"""ARC VOLTA — Static Brawler. Every dash banks static (max 3); the next melee hit discharges it."""
+"""ARC — Static Brawler. Every dash banks static (max 3); the next melee hit discharges it."""
 
 CID = "arc"
 

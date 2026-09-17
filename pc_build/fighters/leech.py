@@ -1,4 +1,4 @@
-"""LEECH MOSS — The Debt Collector. Heals 30% of every point of damage it deals. Bleed it fast."""
+"""LEECH — The Debt Collector. Heals 30% of every point of damage it deals. Bleed it fast."""
 
 CID = "leech"
 

@@ -40,6 +40,8 @@
     50% { box-shadow: 0 0 0 16px rgba(255,182,46,0); }
   }
   .sub { margin-top: 14px; color: #8f8fa8; font-size: 14px; animation: fadeUp 1s .4s ease both; }
+  .status { color: #9be7b1; font-weight: 700; }
+  .status.down { color: #ff9b9b; }
   .hero-shot {
     margin: 38px auto 0; max-width: 760px; border-radius: 18px; overflow: hidden;
     border: 1px solid #3a3a5c; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 60px rgba(255,122,60,.15);
@@ -158,7 +160,7 @@
   <header class="hero">
     <div class="kicker">A free Smash-like arena battler for PC</div>
     <h1>RIFTBREAK SMASH</h1>
-    <p class="tag">10 fighters. 18 arenas. Online rooms with a 5-letter code. No install, no accounts — just run it and fight.</p>
+    <p class="tag">10 fighters. 18 arenas. Private Internet Rooms with an 8-character code. No accounts — just run it and fight.</p>
     <div class="btnrow">
     <a class="dl" href="https://github.com/Seemperer/Riftbreak-smash/releases">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/></svg>
@@ -166,7 +168,7 @@
     </a>
     <a class="ghost" href="https://github.com/Seemperer/Riftbreak-smash">View source</a>
     </div>
-    <p class="sub">~17MB single .exe &middot; Windows 10/11 &middot; free forever</p>
+    <p class="sub">~17MB single .exe &middot; Windows 10/11 &middot; <span class="status" id="relay-status">Checking online service…</span></p>
     <div class="stats">
       <div><b>10</b><span>fighters</span></div>
       <div><b>18</b><span>arenas</span></div>
@@ -216,11 +218,11 @@
   <section class="reveal" id="online">
     <h2>Play with friends online</h2>
     <ol>
-      <li>Host: <b>ONLINE → INTERNET ROOM → HOST ROOM</b> — you get a 5-letter room code.</li>
+      <li>Host: <b>ONLINE → INTERNET ROOM → HOST ROOM</b> — you get a private 8-character room code.</li>
       <li>Send the code to your friend. Friend: <b>ONLINE → INTERNET ROOM → JOIN ROOM</b>, types it in.</li>
-      <li>Both pick fighters, host presses ENTER. No accounts, no port forwarding.</li>
+      <li>Both pick fighters, host presses ENTER. The relay uses encrypted WebSockets; no accounts or port forwarding.</li>
     </ol>
-    <p>Same classroom? LAN play works too (the host PC needs port <b>7001</b> reachable). If school WiFi blocks everything, put both PCs on a phone hotspot.</p>
+    <p>Same classroom? LAN play is still the lowest-latency option (the host PC needs port <b>7001</b> reachable).</p>
   </section>
 
   <section class="reveal">
@@ -237,7 +239,7 @@
     <h2>Modes</h2>
     <div class="grid">
       <div class="card"><b>Solo vs CPU</b><br>Four difficulties from punching-bag Rookie up to Nightmare, which reads your habits. Learn a new fighter here first.</div>
-      <div class="card"><b>Internet rooms</b><br>Host gets a 5-letter code, friend joins from anywhere. Host simulates, guest mirrors — smooth on normal broadband.</div>
+      <div class="card"><b>Internet rooms</b><br>Host gets an 8-character private code, friend joins from anywhere. Host simulates, guest mirrors — smooth on normal broadband.</div>
       <div class="card"><b>Classroom LAN</b><br>Same WiFi, lowest latency. One PC hosts on port 7001, the other joins its IP. No internet needed at all.</div>
     </div>
   </section>
@@ -270,7 +272,7 @@
       <details><summary>Is it really free?</summary><p>Yes. No ads, no accounts, no microtransactions. One exe, full game.</p></details>
       <details><summary>Windows only? What about Mac / phones?</summary><p>Right now: Windows 10/11 PCs only. It needs a keyboard (or an 8BitDo-style gamepad) and ~100MB of disk.</p></details>
       <details><summary>Windows says it "protected my PC". Is it a virus?</summary><p>No — SmartScreen warns about any new unsigned program. Click <b>More info → Run anyway</b>. If you want, scan it with Windows Security first; it passes clean.</p></details>
-      <details><summary>Online lags at my school. Fix?</summary><p>Try an internet room first. If the school firewall eats it, use classroom LAN (host port 7001), or put both PCs on a phone hotspot — that almost always works.</p></details>
+      <details><summary>Online lags at my school. Fix?</summary><p>Use an Internet Room first: it runs over normal secure web traffic. If the connection is still poor, use classroom LAN (host port 7001) or a phone hotspot.</p></details>
       <details><summary>Can I use a controller?</summary><p>Yes — 8BitDo SN30 in XInput mode (boot with Start+X) plus most XInput pads. The game shows live pad status on the title screen.</p></details>
       <details><summary>Where are my wins saved?</summary><p>On your own PC at <b>%USERPROFILE%\.riftbreak\save.json</b> — per-fighter records and your win streak live there, even offline.</p></details>
     </div>
@@ -322,6 +324,15 @@
     es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } });
   }, { threshold: .12 });
   els.forEach(function (e) { io.observe(e); });
+
+  var status = document.getElementById('relay-status');
+  fetch('/api/rooms', { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('offline');
+    status.textContent = 'Online service ready';
+  }).catch(function () {
+    status.textContent = 'Online service unavailable';
+    status.classList.add('down');
+  });
 })();
 // back to top + nav highlight
 (function () {

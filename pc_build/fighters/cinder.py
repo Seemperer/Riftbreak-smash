@@ -1,4 +1,4 @@
-"""CINDER VEX — Meteor Heretic. Calls down delayed, telegraphed meteors. Burn on big hits."""
+"""CINDER — Meteor Heretic. Calls down delayed, telegraphed meteors. Burn on big hits."""
 
 CID = "cinder"
 
